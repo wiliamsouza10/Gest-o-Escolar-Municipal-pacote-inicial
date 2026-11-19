@@ -101,7 +101,14 @@
         <div class="panel"><div class="panel-head"><div><h3>Turmas</h3><p class="muted">Organização por etapa, ano e turno.</p></div></div>
           <form id="class-form" class="form-grid">
             <label>Nome da turma<input name="name" required placeholder="Ex.: 5º ano A"></label><label>Etapa<input name="grade_level" required placeholder="Ex.: 5º ano do Ensino Fundamental"></label>
-            <label>Turno<select name="shift"><option>Matutino</option><option>Vespertino</option><option>Noturno</option><option>Integral</option></select></label>
+            <label>Turno
+              <select name="shift">
+                <option value="Matutino">Matutino</option>
+                <option value="Vespertino">Vespertino</option>
+                <option value="Noturno">Noturno</option>
+                <option value="Integral">Integral</option>
+              </select>
+            </label>
             <label>Ano letivo<input name="school_year" type="number" min="2020" max="2100" required></label>
             <label>Escola<select name="school_id" id="class-school" required><option value="">Selecione</option></select></label><label>Professor responsável<select name="teacher_id" id="class-teacher"><option value="">Não definido</option></select></label>
             <button class="primary" type="submit">Criar turma</button>
