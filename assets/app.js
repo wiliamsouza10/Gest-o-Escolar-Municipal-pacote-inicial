@@ -4,7 +4,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
   CONFIGURAÇÃO: substitua pelos dados do projeto Supabase.
   Não coloque a chave service_role neste arquivo. Use somente a chave anon/public.
 */
-const SUPABASE_URL = "https://xkuypxublyyrevrmaale.supabase.co/rest/v1/";
+const SUPABASE_URL = "https://xkuypxublyyrevrmaale.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_AK9mLZ12c6fUaltPDtTD2Q_oNfG6sXD";
 
 const configured = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("COLE_AQUI") && !SUPABASE_ANON_KEY.includes("COLE_AQUI");
