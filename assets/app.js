@@ -7,8 +7,9 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = "https://xkuypxublyyrevrmaale.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_AK9mLZ12c6fUaltPDtTD2Q_oNfG6sXD";
 
-const configured = SUPABASE_URL.startsWith("https://") && !SUPABASE_URL.includes("https://xkuypxublyyrevrmaale.supabase.co") && !SUPABASE_ANON_KEY.includes("sb_publishable_AK9mLZ12c6fUaltPDtTD2Q_oNfG6sXD");
-const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const configured =
+  Boolean(SUPABASE_URL && SUPABASE_URL.startsWith("https://")) &&
+  Boolean(SUPABASE_ANON_KEY && SUPABASE_ANON_KEY.trim().length > 0);
 let currentProfile = null;
 let cachedSchools = [], cachedStudents = [], cachedClasses = [];
 let attendanceRows = [];
