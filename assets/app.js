@@ -137,7 +137,7 @@ async function loadProfiles() {
   } catch (e) {
     console.warn("Não foi possível carregar perfis:", e);
     fillSelect("class-teacher", [], x => x.full_name, "Não definido");
-    $("users-body").innerHTML = '<tr><td colspan="3">Não foi possível carregar os usuários. Verifique as permissões da tabela profiles.</td></tr>';
+    $("users-body").innerHTML = '<tr><td colspan="4">Não foi possível carregar os usuários. Verifique as permissões da tabela profiles.</td></tr>';
   }
 }
 async function loadAll() {
@@ -209,10 +209,66 @@ function renderEnrollments(rows) {
 }
 function renderUsers() {
   if (!$("users-body")) return;
-  $("users-body").innerHTML = cachedProfiles.map(u =>
-    `<tr><td>${escapeHtml(u.full_name || "—")}</td><td>${escapeHtml(roleNames[u.role] || u.role || "—")}</td><td>${escapeHtml(u.schools?.name || "Rede / Não vinculada")}</td></tr>`
-  ).join("") || '<tr><td colspan="3">Nenhum usuário cadastrado.</td></tr>';
+  $("users-body").innerHTML = cachedProfiles.map(u => {
+    const isSelf = u.id === currentProfile?.id;
+    const actionBtn = isSelf
+      ? `<span class="muted small">Conta atual</span>`
+      : `<button type="button" class="secondary small" data-delete-user="${escapeHtml(u.id)}" data-user-name="${escapeHtml(u.full_name || "este usuário")}">Excluir</button>`;
+    return `<tr>
+      <td>${escapeHtml(u.full_name || "—")}</td>
+      <td>${escapeHtml(roleNames[u.role] || u.role || "—")}</td>
+      <td>${escapeHtml(u.schools?.name || "Rede / Não vinculada")}</td>
+      <td>${actionBtn}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="4">Nenhum usuário cadastrado.</td></tr>';
 }
+
+async function callUserFunction(payload) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/${CREATE_USER_FUNCTION}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": SUPABASE_ANON_KEY
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.error || "Não foi possível concluir a operação.");
+  }
+  return result;
+}
+
+$("users-body")?.addEventListener("click", async e => {
+  const btn = e.target.closest("[data-delete-user]");
+  if (!btn) return;
+  if (currentProfile?.role !== "secretaria") {
+    notice("Apenas o perfil Secretaria de Educação pode excluir usuários.", true);
+    return;
+  }
+
+  const userId = btn.dataset.deleteUser;
+  const userName = btn.dataset.userName;
+  const confirmed = window.confirm(`Tem certeza que deseja excluir o acesso de "${userName}"? Essa ação remove o login e o perfil do sistema.`);
+  if (!confirmed) return;
+
+  btn.disabled = true;
+  try {
+    await callUserFunction({ action: "delete", user_id: userId });
+    notice("Usuário removido com sucesso.");
+    await loadProfiles();
+  } catch (err) {
+    console.error(err);
+    notice(err.message || "Não foi possível excluir o usuário.", true);
+    btn.disabled = false;
+  }
+});
 
 const userForm = $("user-form");
 if (userForm) {
@@ -233,25 +289,7 @@ if (userForm) {
     };
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error("Sessão expirada. Faça login novamente.");
-
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/${CREATE_USER_FUNCTION}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-          "apikey": SUPABASE_ANON_KEY
-        },
-        body: JSON.stringify(body)
-      });
-
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.error || "Não foi possível criar o usuário.");
-      }
-
+      await callUserFunction(body);
       userForm.reset();
       notice("Usuário cadastrado com sucesso.");
       await loadProfiles();
