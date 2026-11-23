@@ -14,9 +14,26 @@ const configured =
 
 const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 let currentProfile = null;
-let selectedSchoolId = ""; // "" = visão geral da rede; UUID = escola selecionada pela Secretaria
+let selectedSchoolId = "";
 let cachedSchools = [], cachedStudents = [], cachedClasses = [], cachedEnrollments = [], cachedProfiles = [];
 let attendanceRows = [];
+
+const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v1";
+const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v1";
+
+const defaultCurriculum = [
+  { id: "curr-1", stage: "Educação Infantil", subject: "O eu, o outro e o nós", area: "Campos de Experiência", annual_hours: 800 },
+  { id: "curr-2", stage: "Educação Infantil", subject: "Corpo, gestos e movimentos", area: "Campos de Experiência", annual_hours: 800 },
+  { id: "curr-3", stage: "Ensino Fundamental I (1º ao 5º ano)", subject: "Língua Portuguesa", area: "Linguagens", annual_hours: 240 },
+  { id: "curr-4", stage: "Ensino Fundamental I (1º ao 5º ano)", subject: "Matemática", area: "Matemática", annual_hours: 240 },
+  { id: "curr-5", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "Língua Portuguesa", area: "Linguagens", annual_hours: 200 },
+  { id: "curr-6", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "Matemática", area: "Matemática", annual_hours: 200 },
+  { id: "curr-7", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "Ciências", area: "Ciências da Natureza", annual_hours: 120 },
+  { id: "curr-8", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "História / Geografia", area: "Ciências Humanas", annual_hours: 160 }
+];
+
+let cachedCurriculum = loadLocalJson(CURRICULUM_STORAGE_KEY, defaultCurriculum);
+let cachedCensus = loadLocalJson(CENSUS_STORAGE_KEY, []);
 
 const $ = (id) => document.getElementById(id);
 const today = new Date().toISOString().slice(0,10);
@@ -26,6 +43,23 @@ const roleNames = {
   secretario_escolar: "Secretário escolar",
   professor: "Professor"
 };
+
+function loadLocalJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveLocalJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.warn("Não foi possível salvar localmente:", e);
+  }
+}
 
 function isSecretaria() {
   return currentProfile?.role === "secretaria";
@@ -90,11 +124,15 @@ function go(page) {
     matriculas: "Matrículas",
     turmas: "Turmas",
     diario: "Diário de classe",
+    matriz: "Matriz curricular por etapa",
+    censo: "Mapeamento do Censo Escolar",
     relatorios: "Relatórios",
     usuarios: "Cadastro de usuários"
   })[page] || "Gestão Escolar";
   if (page === "diario") loadLessons();
   if (page === "usuarios") loadProfiles();
+  if (page === "matriz") renderCurriculum();
+  if (page === "censo") renderCensus();
 }
 document.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.page)));
 document.querySelectorAll("[data-goto]").forEach(b => b.addEventListener("click", () => go(b.dataset.goto)));
@@ -243,6 +281,7 @@ function applySchoolScope() {
   renderEnrollments(scopedEnrollments);
   fillSelects(scopedStudents, scopedClasses);
   renderUsers();
+  renderCensus();
   loadLessons();
 }
 
@@ -307,6 +346,7 @@ function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getSc
   fillSelect("student-school", cachedSchools, x => x.name);
   fillSelect("class-school", cachedSchools, x => x.name);
   fillSelect("user-school", cachedSchools, x => x.name, "Rede / Não vinculada");
+  fillSelect("census-school", cachedSchools, x => formatSchoolOption(x), "Selecione a escola");
   fillSelect("enrollment-student", scopedStudents, x => x.full_name);
   fillSelect("enrollment-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
   fillSelect("diary-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
@@ -317,21 +357,63 @@ function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getSc
     if ($("student-school")) $("student-school").value = selectedSchoolId;
     if ($("class-school")) $("class-school").value = selectedSchoolId;
     if ($("user-school")) $("user-school").value = selectedSchoolId;
+    if ($("census-school")) $("census-school").value = selectedSchoolId;
   }
 }
+
+// --- ESCOLAS (COM GESTOR E EXCLUSÃO PELA SECRETARIA) ---
 function renderSchools() {
+  if (!$("schools-body")) return;
   $("schools-body").innerHTML = cachedSchools.map(s => {
     const isSelected = s.id === selectedSchoolId;
-    return `<tr data-select-school="${escapeHtml(s.id)}" style="cursor:pointer;${isSelected ? "background:#eef5ff;font-weight:600;" : ""}" title="Clique para acessar os dados desta escola">
+    const deleteBtn = isSecretaria()
+      ? `<button type="button" class="secondary small" data-delete-school="${escapeHtml(s.id)}" data-school-name="${escapeHtml(s.name)}">Excluir</button>`
+      : `<span class="muted small">—</span>`;
+    return `<tr data-select-school="${escapeHtml(s.id)}" style="cursor:pointer;${isSelected ? "background:#eef5ff;font-weight:600;" : ""}" title="Clique na linha para direcionar à escola">
       <td>${escapeHtml(s.name)}${isSelected ? " (Selecionada)" : ""}</td>
+      <td>${escapeHtml(s.manager_name || "—")}</td>
       <td>${escapeHtml(s.inep_code || "—")}</td>
       <td>${escapeHtml(s.address || "—")}</td>
       <td>${escapeHtml(s.phone || "—")}</td>
+      <td>${deleteBtn}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="4">Nenhuma escola cadastrada.</td></tr>';
+  }).join("") || '<tr><td colspan="6">Nenhuma escola cadastrada.</td></tr>';
 }
 
-$("schools-body")?.addEventListener("click", e => {
+$("schools-body")?.addEventListener("click", async e => {
+  const delBtn = e.target.closest("[data-delete-school]");
+  if (delBtn) {
+    e.stopPropagation();
+    if (!isSecretaria()) {
+      notice("Apenas o perfil Secretaria de Educação pode excluir escolas.", true);
+      return;
+    }
+    const schoolId = delBtn.dataset.deleteSchool;
+    const schoolName = delBtn.dataset.schoolName;
+    const confirmed = window.confirm(`Deseja realmente excluir a escola "${schoolName}"? Use esta opção apenas para cadastros incorretos sem vínculos ativos.`);
+    if (!confirmed) return;
+
+    delBtn.disabled = true;
+    try {
+      const { error } = await supabase.from("schools").delete().eq("id", schoolId);
+      if (error) throw error;
+      if (selectedSchoolId === schoolId) {
+        selectedSchoolId = "";
+        if ($("secretaria-school-search")) $("secretaria-school-search").value = "";
+        updateRoleLabel();
+      }
+      cachedCensus = cachedCensus.filter(c => c.school_id !== schoolId);
+      saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
+      notice("Escola removida com sucesso.");
+      await loadAll();
+    } catch (err) {
+      console.error(err);
+      notice("Não foi possível excluir a escola. Verifique se há alunos, turmas ou usuários vinculados a ela.", true);
+      delBtn.disabled = false;
+    }
+    return;
+  }
+
   if (!isSecretaria()) return;
   const row = e.target.closest("[data-select-school]");
   if (!row) return;
@@ -376,6 +458,139 @@ function renderUsers() {
     </tr>`;
   }).join("") || '<tr><td colspan="4">Nenhum usuário cadastrado.</td></tr>';
 }
+
+// --- MATRIZ CURRICULAR POR ETAPA DE ENSINO ---
+function renderCurriculum() {
+  if (!$("curriculum-body")) return;
+  const filterStage = $("curriculum-filter-stage")?.value || "";
+  const items = filterStage
+    ? cachedCurriculum.filter(item => item.stage === filterStage)
+    : cachedCurriculum;
+
+  const canManage = isSecretaria() || currentProfile?.role === "gestor";
+  $("curriculum-body").innerHTML = items.map(item => {
+    const delBtn = canManage
+      ? `<button type="button" class="secondary small" data-delete-curriculum="${escapeHtml(item.id)}">Remover</button>`
+      : `<span class="muted small">—</span>`;
+    return `<tr>
+      <td>${escapeHtml(item.stage)}</td>
+      <td>${escapeHtml(item.subject)}</td>
+      <td>${escapeHtml(item.area || "—")}</td>
+      <td>${escapeHtml(String(item.annual_hours))}h</td>
+      <td>${delBtn}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="5">Nenhum componente curricular cadastrado para esta etapa.</td></tr>';
+}
+
+$("curriculum-filter-stage")?.addEventListener("change", renderCurriculum);
+
+$("curriculum-form")?.addEventListener("submit", e => {
+  e.preventDefault();
+  if (!isSecretaria() && currentProfile?.role !== "gestor") {
+    notice("Apenas Secretaria ou Gestor podem alterar a matriz curricular.", true);
+    return;
+  }
+  const data = formObject(e.target);
+  const newItem = {
+    id: `curr-${Date.now()}`,
+    stage: data.stage,
+    subject: String(data.subject || "").trim(),
+    area: String(data.area || "").trim() || "Formação Geral Básica",
+    annual_hours: Number(data.annual_hours) || 0
+  };
+  cachedCurriculum = [newItem, ...cachedCurriculum];
+  saveLocalJson(CURRICULUM_STORAGE_KEY, cachedCurriculum);
+  e.target.reset();
+  if ($("curriculum-stage-select")) $("curriculum-stage-select").value = newItem.stage;
+  renderCurriculum();
+  notice("Componente adicionado à matriz curricular.");
+});
+
+$("curriculum-body")?.addEventListener("click", e => {
+  const btn = e.target.closest("[data-delete-curriculum]");
+  if (!btn) return;
+  if (!isSecretaria() && currentProfile?.role !== "gestor") {
+    notice("Apenas Secretaria ou Gestor podem remover itens da matriz curricular.", true);
+    return;
+  }
+  const id = btn.dataset.deleteCurriculum;
+  cachedCurriculum = cachedCurriculum.filter(x => x.id !== id);
+  saveLocalJson(CURRICULUM_STORAGE_KEY, cachedCurriculum);
+  renderCurriculum();
+  notice("Componente removido da matriz curricular.");
+});
+
+// --- MAPEAMENTO DO CENSO ESCOLAR ---
+function renderCensus() {
+  if (!$("census-body")) return;
+  const scopedStudents = getScopedStudents();
+  const scopedEnrollments = getScopedEnrollments();
+  const validStudents = scopedStudents.filter(s => s.full_name && s.birth_date && s.school_id);
+  const activeEnrollments = scopedEnrollments.filter(e => e.status === "ativa");
+
+  const visibleCensus = selectedSchoolId
+    ? cachedCensus.filter(c => c.school_id === selectedSchoolId)
+    : cachedCensus;
+
+  if ($("censo-schools-count")) $("censo-schools-count").textContent = selectedSchoolId ? 1 : cachedSchools.length;
+  if ($("censo-students-count")) $("censo-students-count").textContent = validStudents.length;
+  if ($("censo-enrollments-count")) $("censo-enrollments-count").textContent = activeEnrollments.length;
+
+  $("census-body").innerHTML = visibleCensus.map(row => {
+    const school = cachedSchools.find(s => s.id === row.school_id);
+    const delBtn = isSecretaria()
+      ? `<button type="button" class="secondary small" data-delete-census="${escapeHtml(row.id)}">Excluir</button>`
+      : `<span class="muted small">—</span>`;
+    return `<tr>
+      <td>${escapeHtml(school?.name || row.school_name || "—")}</td>
+      <td>${escapeHtml(school?.inep_code || "Sem INEP")}</td>
+      <td>${escapeHtml(String(row.census_year))}</td>
+      <td>${escapeHtml(row.operating_status)}</td>
+      <td>${escapeHtml(row.offered_stages)}</td>
+      <td>${escapeHtml(row.validation_status)}</td>
+      <td>${delBtn}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="7">Nenhum mapeamento do Censo Escolar registrado ainda.</td></tr>';
+}
+
+$("census-form")?.addEventListener("submit", e => {
+  e.preventDefault();
+  const data = formObject(e.target);
+  const school = cachedSchools.find(s => s.id === data.school_id);
+  if (!school) {
+    notice("Selecione uma unidade escolar válida para o Censo.", true);
+    return;
+  }
+  const entry = {
+    id: `censo-${school.id}-${data.census_year}`,
+    school_id: school.id,
+    school_name: school.name,
+    census_year: Number(data.census_year) || new Date().getFullYear(),
+    operating_status: data.operating_status,
+    offered_stages: String(data.offered_stages || "").trim(),
+    infrastructure_notes: String(data.infrastructure_notes || "").trim(),
+    validation_status: data.validation_status
+  };
+
+  cachedCensus = [entry, ...cachedCensus.filter(x => x.id !== entry.id)];
+  saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
+  renderCensus();
+  notice(`Mapeamento do Censo salvo para ${school.name}.`);
+});
+
+$("census-body")?.addEventListener("click", e => {
+  const btn = e.target.closest("[data-delete-census]");
+  if (!btn) return;
+  if (!isSecretaria()) {
+    notice("Apenas o perfil Secretaria de Educação pode excluir registros do Censo.", true);
+    return;
+  }
+  const id = btn.dataset.deleteCensus;
+  cachedCensus = cachedCensus.filter(x => x.id !== id);
+  saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
+  renderCensus();
+  notice("Registro do Censo removido.");
+});
 
 async function callUserFunction(payload) {
   const { data: sessionData } = await supabase.auth.getSession();
@@ -466,6 +681,7 @@ async function insertForm(formId, table, transform=(x)=>x, onSuccess=null) {
       if (error) throw error;
       form.reset();
       document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
+      if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
       notice("Registro salvo com sucesso.");
       await loadAll();
       if (onSuccess && data) onSuccess(data);
@@ -475,11 +691,19 @@ async function insertForm(formId, table, transform=(x)=>x, onSuccess=null) {
     }
   });
 }
-insertForm("school-form", "schools", x => x, (createdSchool) => {
+
+insertForm("school-form", "schools", x => ({
+  name: String(x.name || "").trim(),
+  manager_name: String(x.manager_name || "").trim() || null,
+  inep_code: String(x.inep_code || "").trim() || null,
+  address: String(x.address || "").trim() || null,
+  phone: String(x.phone || "").trim() || null
+}), (createdSchool) => {
   if (isSecretaria() && createdSchool?.id) {
     setActiveSchool(createdSchool, true);
   }
 });
+
 insertForm("student-form", "students", x => ({
   ...x,
   birth_date: x.birth_date || null,
@@ -568,3 +792,4 @@ $("save-attendance").addEventListener("click", async () => {
 });
 $("attendance-date").value = today;
 document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
+if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
