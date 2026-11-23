@@ -70,9 +70,15 @@ function canManageCurriculumAndMonitors() {
   return isSecretaria() || currentProfile?.role === "gestor";
 }
 
+function getEffectiveSchoolId() {
+  if (isSecretaria()) return selectedSchoolId || "";
+  return currentProfile?.school_id || "";
+}
+
 function getActiveSchool() {
-  if (!selectedSchoolId) return null;
-  return cachedSchools.find(s => s.id === selectedSchoolId) || null;
+  const effectiveId = getEffectiveSchoolId();
+  if (!effectiveId) return null;
+  return cachedSchools.find(s => s.id === effectiveId) || null;
 }
 
 function notice(message, bad=false) {
@@ -267,40 +273,79 @@ $("secretaria-clear-school")?.addEventListener("click", () => {
   setActiveSchool(null, false);
 });
 
+function getScopedSchools() {
+  if (isSecretaria()) {
+    return selectedSchoolId
+      ? cachedSchools.filter(s => s.id === selectedSchoolId)
+      : cachedSchools;
+  }
+  const schoolId = getEffectiveSchoolId();
+  if (!schoolId) return [];
+  return cachedSchools.filter(s => s.id === schoolId);
+}
+
 function getScopedStudents() {
-  if (!selectedSchoolId) return cachedStudents;
-  return cachedStudents.filter(s => s.school_id === selectedSchoolId);
+  if (isSecretaria()) {
+    return selectedSchoolId
+      ? cachedStudents.filter(s => s.school_id === selectedSchoolId)
+      : cachedStudents;
+  }
+  const schoolId = getEffectiveSchoolId();
+  if (!schoolId) return [];
+  return cachedStudents.filter(s => s.school_id === schoolId);
 }
 
 function getScopedClasses() {
-  if (!selectedSchoolId) return cachedClasses;
-  return cachedClasses.filter(c => c.school_id === selectedSchoolId);
+  if (isSecretaria()) {
+    return selectedSchoolId
+      ? cachedClasses.filter(c => c.school_id === selectedSchoolId)
+      : cachedClasses;
+  }
+  const schoolId = getEffectiveSchoolId();
+  if (!schoolId) return [];
+  return cachedClasses.filter(c => c.school_id === schoolId);
 }
 
 function getScopedEnrollments() {
-  if (!selectedSchoolId) return cachedEnrollments;
-  const classIds = new Set(getScopedClasses().map(c => c.id));
-  const studentIds = new Set(getScopedStudents().map(s => s.id));
-  return cachedEnrollments.filter(e => classIds.has(e.class_id) || studentIds.has(e.student_id));
+  const scopedStudents = getScopedStudents();
+  const scopedClasses = getScopedClasses();
+
+  if (isSecretaria() && !selectedSchoolId) {
+    return cachedEnrollments;
+  }
+
+  const classIds = new Set(scopedClasses.map(c => c.id));
+  const studentIds = new Set(scopedStudents.map(s => s.id));
+  return cachedEnrollments.filter(e =>
+    (e.class_id && classIds.has(e.class_id)) ||
+    (e.student_id && studentIds.has(e.student_id))
+  );
 }
 
 function applySchoolScope() {
   updateRoleLabel();
+  const scopedSchools = getScopedSchools();
   const scopedStudents = getScopedStudents();
   const scopedClasses = getScopedClasses();
   const scopedEnrollments = getScopedEnrollments();
-  const activeEnrollmentsCount = scopedEnrollments.filter(x => x.status === "ativa").length;
 
-  $("stat-escolas").textContent = selectedSchoolId ? 1 : cachedSchools.length;
+  const activeStudentIds = new Set(
+    scopedEnrollments
+      .filter(e => e.status === "ativa" && e.student_id)
+      .map(e => e.student_id)
+  );
+  const activeStudentsCount = activeStudentIds.size;
+
+  $("stat-escolas").textContent = scopedSchools.length;
   $("stat-alunos").textContent = scopedStudents.length;
   $("stat-turmas").textContent = scopedClasses.length;
-  $("stat-matriculas").textContent = activeEnrollmentsCount;
+  $("stat-matriculas").textContent = activeStudentsCount;
 
   $("report-students").textContent = scopedStudents.length;
   $("report-classes").textContent = scopedClasses.length;
-  $("report-enrollments").textContent = activeEnrollmentsCount;
+  $("report-enrollments").textContent = activeStudentsCount;
 
-  renderSchools();
+  renderSchools(scopedSchools);
   renderStudents(scopedStudents);
   renderClasses(scopedClasses);
   renderEnrollments(scopedEnrollments);
@@ -312,7 +357,13 @@ function applySchoolScope() {
 }
 
 async function fetchRows(table, select="*") {
-  const { data, error } = await supabase.from(table).select(select).order("created_at", { ascending: false }).limit(500);
+  const orderCol = table === "schools" ? "name" : "created_at";
+  const ascending = table === "schools";
+  const { data, error } = await supabase
+    .from(table)
+    .select(select)
+    .order(orderCol, { ascending })
+    .limit(500);
   if (error) throw error;
   return data || [];
 }
@@ -335,8 +386,9 @@ async function loadProfiles() {
   }
 }
 function fillTeacherSelect() {
+  const effectiveId = getEffectiveSchoolId();
   const teachers = cachedProfiles.filter(p =>
-    p.role === "professor" && (!selectedSchoolId || !p.school_id || p.school_id === selectedSchoolId)
+    p.role === "professor" && (!effectiveId || !p.school_id || p.school_id === effectiveId)
   );
   fillSelect("class-teacher", teachers, x => x.full_name || "Professor sem nome", "Não definido");
 }
@@ -369,9 +421,10 @@ function fillSelect(id, items, labelFn, placeholder="Selecione") {
   if (items.some(x => x.id === old)) el.value = old;
 }
 function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getScopedClasses()) {
+  const effectiveId = getEffectiveSchoolId();
   const availableSchools = isSecretaria()
     ? cachedSchools
-    : cachedSchools.filter(s => s.id === selectedSchoolId);
+    : cachedSchools.filter(s => s.id === effectiveId);
 
   fillSelect("student-school", availableSchools, x => x.name);
   fillSelect("class-school", availableSchools, x => x.name);
@@ -385,21 +438,18 @@ function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getSc
   fillTeacherSelect();
   fillMonitorSubjectSelect();
 
-  if (selectedSchoolId) {
-    if ($("student-school")) $("student-school").value = selectedSchoolId;
-    if ($("class-school")) $("class-school").value = selectedSchoolId;
-    if ($("user-school")) $("user-school").value = selectedSchoolId;
-    if ($("monitor-school")) $("monitor-school").value = selectedSchoolId;
-    if ($("census-school")) $("census-school").value = selectedSchoolId;
+  if (effectiveId) {
+    if ($("student-school")) $("student-school").value = effectiveId;
+    if ($("class-school")) $("class-school").value = effectiveId;
+    if ($("user-school")) $("user-school").value = effectiveId;
+    if ($("monitor-school")) $("monitor-school").value = effectiveId;
+    if ($("census-school")) $("census-school").value = effectiveId;
   }
 }
 
 // --- ESCOLAS (COM GESTOR E EXCLUSÃO PELA SECRETARIA) ---
-function renderSchools() {
+function renderSchools(visibleSchools = getScopedSchools()) {
   if (!$("schools-body")) return;
-  const visibleSchools = isSecretaria()
-    ? cachedSchools
-    : cachedSchools.filter(s => s.id === selectedSchoolId);
 
   $("schools-body").innerHTML = visibleSchools.map(s => {
     const isSelected = isSecretaria() && s.id === selectedSchoolId;
@@ -475,8 +525,9 @@ function renderEnrollments(rows = getScopedEnrollments()) {
 }
 function renderUsers() {
   if (!$("users-body")) return;
-  const visibleProfiles = selectedSchoolId
-    ? cachedProfiles.filter(u => u.school_id === selectedSchoolId || u.role === "secretaria")
+  const effectiveId = getEffectiveSchoolId();
+  const visibleProfiles = effectiveId
+    ? cachedProfiles.filter(u => u.school_id === effectiveId || u.role === "secretaria")
     : cachedProfiles;
 
   $("users-body").innerHTML = visibleProfiles.map(u => {
@@ -598,8 +649,9 @@ $("curriculum-body")?.addEventListener("click", e => {
 // --- MONITORES DAS DISCIPLINAS COMPLEMENTARES ---
 function renderMonitors() {
   if (!$("monitors-body")) return;
-  const rows = selectedSchoolId
-    ? cachedMonitors.filter(m => !m.school_id || m.school_id === selectedSchoolId)
+  const effectiveId = getEffectiveSchoolId();
+  const rows = effectiveId
+    ? cachedMonitors.filter(m => !m.school_id || m.school_id === effectiveId)
     : cachedMonitors;
 
   const canManage = canManageCurriculumAndMonitors();
@@ -631,18 +683,19 @@ $("monitor-form")?.addEventListener("submit", e => {
     notice("Selecione uma atividade complementar cadastrada na matriz curricular.", true);
     return;
   }
+  const effectiveId = getEffectiveSchoolId();
   const newMonitor = {
     id: `mon-${Date.now()}`,
     monitor_name: String(data.monitor_name || "").trim(),
     subject: String(data.subject || "").trim(),
     stage: data.stage,
-    school_id: isSecretaria() ? (data.school_id || null) : selectedSchoolId,
+    school_id: isSecretaria() ? (data.school_id || null) : effectiveId,
     weekly_hours: Number(data.weekly_hours) || 0
   };
   cachedMonitors = [newMonitor, ...cachedMonitors];
   saveLocalJson(MONITORS_STORAGE_KEY, cachedMonitors);
   e.target.reset();
-  if (selectedSchoolId && $("monitor-school")) $("monitor-school").value = selectedSchoolId;
+  if (effectiveId && $("monitor-school")) $("monitor-school").value = effectiveId;
   renderMonitors();
   notice("Monitor de atividade complementar cadastrado com sucesso.");
 });
@@ -664,18 +717,24 @@ $("monitors-body")?.addEventListener("click", e => {
 // --- MAPEAMENTO DO CENSO ESCOLAR ---
 function renderCensus() {
   if (!$("census-body")) return;
+  const effectiveId = getEffectiveSchoolId();
+  const scopedSchools = getScopedSchools();
   const scopedStudents = getScopedStudents();
   const scopedEnrollments = getScopedEnrollments();
   const validStudents = scopedStudents.filter(s => s.full_name && s.birth_date && s.school_id);
-  const activeEnrollments = scopedEnrollments.filter(e => e.status === "ativa");
+  const activeStudentIds = new Set(
+    scopedEnrollments
+      .filter(e => e.status === "ativa" && e.student_id)
+      .map(e => e.student_id)
+  );
 
-  const visibleCensus = selectedSchoolId
-    ? cachedCensus.filter(c => c.school_id === selectedSchoolId)
+  const visibleCensus = effectiveId
+    ? cachedCensus.filter(c => c.school_id === effectiveId)
     : cachedCensus;
 
-  if ($("censo-schools-count")) $("censo-schools-count").textContent = selectedSchoolId ? 1 : cachedSchools.length;
+  if ($("censo-schools-count")) $("censo-schools-count").textContent = scopedSchools.length;
   if ($("censo-students-count")) $("censo-students-count").textContent = validStudents.length;
-  if ($("censo-enrollments-count")) $("censo-enrollments-count").textContent = activeEnrollments.length;
+  if ($("censo-enrollments-count")) $("censo-enrollments-count").textContent = activeStudentIds.size;
 
   $("census-body").innerHTML = visibleCensus.map(row => {
     const school = cachedSchools.find(s => s.id === row.school_id);
@@ -697,7 +756,7 @@ function renderCensus() {
 $("census-form")?.addEventListener("submit", e => {
   e.preventDefault();
   const data = formObject(e.target);
-  const targetSchoolId = isSecretaria() ? data.school_id : selectedSchoolId;
+  const targetSchoolId = isSecretaria() ? data.school_id : getEffectiveSchoolId();
   const school = cachedSchools.find(s => s.id === targetSchoolId);
   if (!school) {
     notice("Selecione uma unidade escolar válida para o Censo.", true);
@@ -735,9 +794,16 @@ $("census-body")?.addEventListener("click", e => {
 });
 
 async function callUserFunction(payload) {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData?.session?.access_token;
-  if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+  let { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  let token = sessionData?.session?.access_token;
+
+  if (!token || sessionError) {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !refreshed?.session?.access_token) {
+      throw new Error("Sessão expirada. Faça login novamente.");
+    }
+    token = refreshed.session.access_token;
+  }
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/${CREATE_USER_FUNCTION}`, {
     method: "POST",
@@ -802,7 +868,8 @@ if (userForm) {
     try {
       await callUserFunction(body);
       userForm.reset();
-      if (selectedSchoolId && $("user-school")) $("user-school").value = selectedSchoolId;
+      const effectiveId = getEffectiveSchoolId();
+      if (effectiveId && $("user-school")) $("user-school").value = effectiveId;
       notice("Usuário cadastrado com sucesso.");
       await loadProfiles();
     } catch (err) {
@@ -824,11 +891,12 @@ async function insertForm(formId, table, transform=(x)=>x, onSuccess=null) {
       form.reset();
       document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
       if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
-      if (selectedSchoolId) {
-        if ($("student-school")) $("student-school").value = selectedSchoolId;
-        if ($("class-school")) $("class-school").value = selectedSchoolId;
-        if ($("monitor-school")) $("monitor-school").value = selectedSchoolId;
-        if ($("census-school")) $("census-school").value = selectedSchoolId;
+      const effectiveId = getEffectiveSchoolId();
+      if (effectiveId) {
+        if ($("student-school")) $("student-school").value = effectiveId;
+        if ($("class-school")) $("class-school").value = effectiveId;
+        if ($("monitor-school")) $("monitor-school").value = effectiveId;
+        if ($("census-school")) $("census-school").value = effectiveId;
       }
       notice("Registro salvo com sucesso.");
       await loadAll();
@@ -854,7 +922,7 @@ insertForm("school-form", "schools", x => ({
 
 insertForm("student-form", "students", x => ({
   ...x,
-  school_id: isSecretaria() ? x.school_id : selectedSchoolId,
+  school_id: isSecretaria() ? x.school_id : getEffectiveSchoolId(),
   birth_date: x.birth_date || null,
   guardian_name: x.guardian_name || null,
   guardian_phone: x.guardian_phone || null,
@@ -862,7 +930,7 @@ insertForm("student-form", "students", x => ({
 }));
 insertForm("class-form", "classes", x => ({
   ...x,
-  school_id: isSecretaria() ? x.school_id : selectedSchoolId,
+  school_id: isSecretaria() ? x.school_id : getEffectiveSchoolId(),
   school_year: Number(x.school_year),
   teacher_id: x.teacher_id || null
 }));
@@ -883,7 +951,8 @@ async function loadLessons() {
       .order("lesson_date", { ascending: false })
       .limit(50);
     if (error) throw error;
-    const rows = (data || []).filter(l => !selectedSchoolId || l.classes?.school_id === selectedSchoolId);
+    const effectiveId = getEffectiveSchoolId();
+    const rows = (data || []).filter(l => !effectiveId || l.classes?.school_id === effectiveId);
     $("lessons-body").innerHTML = rows.map(l =>
       `<tr><td>${l.lesson_date}</td><td>${escapeHtml(l.classes?.name || "—")}</td><td>${escapeHtml(l.subject)}</td><td>${escapeHtml(l.content)}</td></tr>`
     ).join("") || '<tr><td colspan="4">Nenhuma aula registrada.</td></tr>';
