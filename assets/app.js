@@ -70,6 +70,10 @@ function canManageCurriculumAndMonitors() {
   return isSecretaria() || currentProfile?.role === "gestor";
 }
 
+function canManageClassesAndEnrollments() {
+  return ["secretaria", "gestor", "secretario_escolar"].includes(currentProfile?.role);
+}
+
 function getEffectiveSchoolId() {
   if (isSecretaria()) return selectedSchoolId || "";
   return currentProfile?.school_id || "";
@@ -322,6 +326,13 @@ function getScopedEnrollments() {
   );
 }
 
+function getScopedTeachers(schoolIdFilter = "") {
+  const targetSchoolId = schoolIdFilter || getEffectiveSchoolId();
+  return cachedProfiles.filter(p =>
+    p.role === "professor" && (!targetSchoolId || !p.school_id || p.school_id === targetSchoolId)
+  );
+}
+
 function applySchoolScope() {
   updateRoleLabel();
   const scopedSchools = getScopedSchools();
@@ -379,6 +390,7 @@ async function loadProfiles() {
     cachedProfiles = data || [];
     renderUsers();
     fillTeacherSelect();
+    renderClasses(getScopedClasses());
   } catch (e) {
     console.warn("Não foi possível carregar perfis:", e);
     fillSelect("class-teacher", [], x => x.full_name, "Não definido");
@@ -386,12 +398,15 @@ async function loadProfiles() {
   }
 }
 function fillTeacherSelect() {
-  const effectiveId = getEffectiveSchoolId();
-  const teachers = cachedProfiles.filter(p =>
-    p.role === "professor" && (!effectiveId || !p.school_id || p.school_id === effectiveId)
-  );
+  const formSchoolId = isSecretaria() ? ($("class-school")?.value || selectedSchoolId) : getEffectiveSchoolId();
+  const teachers = getScopedTeachers(formSchoolId);
   fillSelect("class-teacher", teachers, x => x.full_name || "Professor sem nome", "Não definido");
 }
+
+$("class-school")?.addEventListener("change", () => {
+  fillTeacherSelect();
+});
+
 async function loadAll() {
   try {
     const [schools, students, classes, enrollments] = await Promise.all([
@@ -514,10 +529,69 @@ function renderStudents(rows = getScopedStudents()) {
   ).join("") || '<tr><td colspan="4">Nenhum aluno cadastrado.</td></tr>';
 }
 function renderClasses(rows = getScopedClasses()) {
-  $("classes-body").innerHTML = rows.map(c =>
-    `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.grade_level)}</td><td>${escapeHtml(c.shift)}</td><td>${c.school_year}</td><td>${escapeHtml(c.schools?.name || "—")}</td></tr>`
-  ).join("") || '<tr><td colspan="5">Nenhuma turma cadastrada.</td></tr>';
+  const canAssignTeacher = canManageClassesAndEnrollments();
+  $("classes-body").innerHTML = rows.map(c => {
+    const classTeachers = getScopedTeachers(c.school_id);
+    const currentTeacher = cachedProfiles.find(p => p.id === c.teacher_id);
+    const teacherCell = canAssignTeacher
+      ? `<select data-assign-teacher="${escapeHtml(c.id)}">
+          <option value="">Não definido</option>
+          ${classTeachers.map(t => `<option value="${escapeHtml(t.id)}"${t.id === c.teacher_id ? " selected" : ""}>${escapeHtml(t.full_name || "Professor sem nome")}</option>`).join("")}
+        </select>`
+      : escapeHtml(currentTeacher?.full_name || "Não definido");
+
+    return `<tr>
+      <td>${escapeHtml(c.name)}</td>
+      <td>${escapeHtml(c.grade_level)}</td>
+      <td>${escapeHtml(c.shift)}</td>
+      <td>${c.school_year}</td>
+      <td>${escapeHtml(c.schools?.name || "—")}</td>
+      <td>${teacherCell}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="6">Nenhuma turma cadastrada.</td></tr>';
 }
+
+$("classes-body")?.addEventListener("change", async e => {
+  const select = e.target.closest("[data-assign-teacher]");
+  if (!select) return;
+  if (!canManageClassesAndEnrollments()) {
+    notice("Seu perfil não tem permissão para vincular professores às turmas.", true);
+    return;
+  }
+
+  const classId = select.dataset.assignTeacher;
+  const teacherId = select.value || null;
+  const targetClass = getScopedClasses().find(c => c.id === classId);
+  if (!targetClass) {
+    notice("Turma fora do escopo da sua unidade escolar.", true);
+    return;
+  }
+
+  if (teacherId) {
+    const allowedTeachers = new Set(getScopedTeachers(targetClass.school_id).map(t => t.id));
+    if (!allowedTeachers.has(teacherId)) {
+      notice("Selecione um professor vinculado à mesma unidade escolar da turma.", true);
+      renderClasses();
+      return;
+    }
+  }
+
+  select.disabled = true;
+  try {
+    const { error } = await supabase
+      .from("classes")
+      .update({ teacher_id: teacherId })
+      .eq("id", classId);
+    if (error) throw error;
+    notice("Professor da turma atualizado com sucesso.");
+    await loadAll();
+  } catch (err) {
+    console.error(err);
+    notice("Não foi possível atualizar o professor da turma.", true);
+    select.disabled = false;
+  }
+});
+
 function renderEnrollments(rows = getScopedEnrollments()) {
   $("enrollments-body").innerHTML = rows.map(e =>
     `<tr><td>${escapeHtml(e.students?.full_name || "—")}</td><td>${escapeHtml(e.classes?.name || "—")}</td><td>${e.school_year}</td><td>${escapeHtml(e.status)}</td></tr>`
@@ -928,16 +1002,92 @@ insertForm("student-form", "students", x => ({
   guardian_phone: x.guardian_phone || null,
   notes: x.notes || null
 }));
-insertForm("class-form", "classes", x => ({
-  ...x,
-  school_id: isSecretaria() ? x.school_id : getEffectiveSchoolId(),
-  school_year: Number(x.school_year),
-  teacher_id: x.teacher_id || null
-}));
-insertForm("enrollment-form", "enrollments", x => ({
-  ...x,
-  school_year: Number(x.school_year)
-}));
+
+$("class-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!canManageClassesAndEnrollments()) {
+    notice("Seu perfil não tem permissão para criar turmas.", true);
+    return;
+  }
+
+  const raw = formObject(e.target);
+  const targetSchoolId = isSecretaria() ? raw.school_id : getEffectiveSchoolId();
+  if (!targetSchoolId) {
+    notice("Selecione ou vincule uma unidade escolar antes de criar a turma.", true);
+    return;
+  }
+
+  const teacherId = raw.teacher_id || null;
+  if (teacherId) {
+    const allowedTeachers = new Set(getScopedTeachers(targetSchoolId).map(t => t.id));
+    if (!allowedTeachers.has(teacherId)) {
+      notice("Selecione um professor vinculado à escola da turma.", true);
+      return;
+    }
+  }
+
+  try {
+    const { error } = await supabase.from("classes").insert({
+      name: String(raw.name || "").trim(),
+      grade_level: String(raw.grade_level || "").trim(),
+      shift: raw.shift,
+      school_year: Number(raw.school_year),
+      school_id: targetSchoolId,
+      teacher_id: teacherId
+    });
+    if (error) throw error;
+
+    e.target.reset();
+    document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
+    if ($("class-school")) $("class-school").value = targetSchoolId;
+    notice("Turma criada com sucesso.");
+    await loadAll();
+  } catch (err) {
+    console.error(err);
+    notice("Não foi possível criar a turma. Verifique os campos obrigatórios e suas permissões.", true);
+  }
+});
+
+$("enrollment-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!canManageClassesAndEnrollments()) {
+    notice("Seu perfil não tem permissão para enturmar alunos.", true);
+    return;
+  }
+
+  const raw = formObject(e.target);
+  const studentId = raw.student_id;
+  const classId = raw.class_id;
+  const schoolYear = Number(raw.school_year);
+  const status = raw.status || "ativa";
+
+  const allowedStudents = new Set(getScopedStudents().map(s => s.id));
+  const allowedClasses = new Set(getScopedClasses().map(c => c.id));
+
+  if (!allowedStudents.has(studentId) || !allowedClasses.has(classId)) {
+    notice("Selecione um aluno e uma turma da unidade escolar vinculada.", true);
+    return;
+  }
+
+  try {
+    const { error } = await supabase.from("enrollments").insert({
+      student_id: studentId,
+      class_id: classId,
+      school_year: schoolYear,
+      status
+    });
+    if (error) throw error;
+
+    e.target.reset();
+    document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
+    notice("Aluno enturmado com sucesso.");
+    await loadAll();
+  } catch (err) {
+    console.error(err);
+    notice("Não foi possível enturmar o aluno. Verifique os campos obrigatórios e suas permissões.", true);
+  }
+});
+
 insertForm("lesson-form", "lessons", x => ({
   ...x,
   teacher_id: currentProfile?.id
@@ -995,20 +1145,4 @@ $("save-attendance").addEventListener("click", async () => {
   const classId = $("attendance-class").value, date = $("attendance-date").value;
   try {
     const payload = attendanceRows.map(x => ({
-      class_id: classId,
-      student_id: x.student_id,
-      attendance_date: date,
-      status: x.status,
-      recorded_by: currentProfile.id
-    }));
-    const { error } = await supabase.from("attendance").upsert(payload, { onConflict: "class_id,student_id,attendance_date" });
-    if (error) throw error;
-    notice("Frequência salva com sucesso.");
-  } catch (e) {
-    console.error(e);
-    notice("Não foi possível salvar a frequência. Verifique as permissões.", true);
-  }
-});
-$("attendance-date").value = today;
-document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
-if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
+      class_id
