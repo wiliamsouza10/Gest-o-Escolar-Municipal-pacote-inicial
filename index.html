@@ -42,7 +42,21 @@
     </aside>
 
     <main class="main">
-      <header class="topbar"><div><p class="eyebrow">PLATAFORMA EDUCACIONAL</p><h2 id="page-title">Painel inicial</h2></div><span class="secure">● Ambiente protegido</span></header>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">PLATAFORMA EDUCACIONAL</p>
+          <h2 id="page-title">Painel inicial</h2>
+        </div>
+        <div class="inline-controls" data-roles="secretaria">
+          <label class="small">
+            Unidade escolar (Nome ou INEP)
+            <input id="secretaria-school-search" list="secretaria-schools-list" placeholder="Todas as escolas da rede (ou digite nome/INEP)">
+            <datalist id="secretaria-schools-list"></datalist>
+          </label>
+          <button id="secretaria-clear-school" class="secondary small" type="button">Toda a rede</button>
+        </div>
+        <span class="secure">● Ambiente protegido</span>
+      </header>
       <section id="notice" class="notice hidden"></section>
 
       <section id="page-inicio" class="page">
