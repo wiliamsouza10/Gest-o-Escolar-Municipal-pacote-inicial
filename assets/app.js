@@ -100,12 +100,24 @@ function updateRoleLabel() {
       ? `Secretaria · ${activeSchool.name}`
       : "Secretaria de Educação · Rede Municipal";
   } else {
-    $("user-role").textContent = roleNames[currentProfile.role] || currentProfile.role;
+    const baseRole = roleNames[currentProfile.role] || currentProfile.role;
+    $("user-role").textContent = activeSchool ? `${baseRole} · ${activeSchool.name}` : baseRole;
   }
 }
 function showApp(profile, user) {
   currentProfile = profile;
-  selectedSchoolId = "";
+
+  if (isSecretaria()) {
+    selectedSchoolId = "";
+  } else {
+    if (!profile.school_id) {
+      $("login-error").textContent = "Seu perfil ainda não possui uma escola vinculada. Solicite à Secretaria de Educação o vínculo da unidade.";
+      supabase?.auth.signOut();
+      return;
+    }
+    selectedSchoolId = profile.school_id;
+  }
+
   $("login-view").classList.add("hidden");
   $("app-view").classList.remove("hidden");
   $("user-name").textContent = profile.full_name || user.email;
@@ -218,6 +230,7 @@ function findSchoolByNameOrInep(term) {
 }
 
 function setActiveSchool(school, redirectToPanel = true) {
+  if (!isSecretaria()) return;
   selectedSchoolId = school ? school.id : "";
   const searchInput = $("secretaria-school-search");
   if (searchInput) {
@@ -235,6 +248,7 @@ function setActiveSchool(school, redirectToPanel = true) {
 }
 
 $("secretaria-school-search")?.addEventListener("change", e => {
+  if (!isSecretaria()) return;
   const raw = e.target.value.trim();
   if (!raw) {
     setActiveSchool(null, false);
@@ -249,6 +263,7 @@ $("secretaria-school-search")?.addEventListener("change", e => {
 });
 
 $("secretaria-clear-school")?.addEventListener("click", () => {
+  if (!isSecretaria()) return;
   setActiveSchool(null, false);
 });
 
@@ -270,6 +285,7 @@ function getScopedEnrollments() {
 }
 
 function applySchoolScope() {
+  updateRoleLabel();
   const scopedStudents = getScopedStudents();
   const scopedClasses = getScopedClasses();
   const scopedEnrollments = getScopedEnrollments();
@@ -353,11 +369,15 @@ function fillSelect(id, items, labelFn, placeholder="Selecione") {
   if (items.some(x => x.id === old)) el.value = old;
 }
 function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getScopedClasses()) {
-  fillSelect("student-school", cachedSchools, x => x.name);
-  fillSelect("class-school", cachedSchools, x => x.name);
+  const availableSchools = isSecretaria()
+    ? cachedSchools
+    : cachedSchools.filter(s => s.id === selectedSchoolId);
+
+  fillSelect("student-school", availableSchools, x => x.name);
+  fillSelect("class-school", availableSchools, x => x.name);
   fillSelect("user-school", cachedSchools, x => x.name, "Rede / Não vinculada");
-  fillSelect("monitor-school", cachedSchools, x => x.name, "Rede / Todas as escolas");
-  fillSelect("census-school", cachedSchools, x => formatSchoolOption(x), "Selecione a escola");
+  fillSelect("monitor-school", availableSchools, x => x.name, isSecretaria() ? "Rede / Todas as escolas" : "Selecione a escola");
+  fillSelect("census-school", availableSchools, x => formatSchoolOption(x), "Selecione a escola");
   fillSelect("enrollment-student", scopedStudents, x => x.full_name);
   fillSelect("enrollment-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
   fillSelect("diary-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
@@ -377,12 +397,16 @@ function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getSc
 // --- ESCOLAS (COM GESTOR E EXCLUSÃO PELA SECRETARIA) ---
 function renderSchools() {
   if (!$("schools-body")) return;
-  $("schools-body").innerHTML = cachedSchools.map(s => {
-    const isSelected = s.id === selectedSchoolId;
+  const visibleSchools = isSecretaria()
+    ? cachedSchools
+    : cachedSchools.filter(s => s.id === selectedSchoolId);
+
+  $("schools-body").innerHTML = visibleSchools.map(s => {
+    const isSelected = isSecretaria() && s.id === selectedSchoolId;
     const deleteBtn = isSecretaria()
       ? `<button type="button" class="secondary small" data-delete-school="${escapeHtml(s.id)}" data-school-name="${escapeHtml(s.name)}">Excluir</button>`
       : `<span class="muted small">—</span>`;
-    return `<tr data-select-school="${escapeHtml(s.id)}" style="cursor:pointer;${isSelected ? "background:#eef5ff;font-weight:600;" : ""}" title="Clique na linha para direcionar à escola">
+    return `<tr data-select-school="${escapeHtml(s.id)}" style="${isSecretaria() ? "cursor:pointer;" : ""}${isSelected ? "background:#eef5ff;font-weight:600;" : ""}">
       <td>${escapeHtml(s.name)}${isSelected ? " (Selecionada)" : ""}</td>
       <td>${escapeHtml(s.manager_name || "—")}</td>
       <td>${escapeHtml(s.inep_code || "—")}</td>
@@ -390,7 +414,7 @@ function renderSchools() {
       <td>${escapeHtml(s.phone || "—")}</td>
       <td>${deleteBtn}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="6">Nenhuma escola cadastrada.</td></tr>';
+  }).join("") || '<tr><td colspan="6">Nenhuma escola vinculada.</td></tr>';
 }
 
 $("schools-body")?.addEventListener("click", async e => {
@@ -612,7 +636,7 @@ $("monitor-form")?.addEventListener("submit", e => {
     monitor_name: String(data.monitor_name || "").trim(),
     subject: String(data.subject || "").trim(),
     stage: data.stage,
-    school_id: data.school_id || null,
+    school_id: isSecretaria() ? (data.school_id || null) : selectedSchoolId,
     weekly_hours: Number(data.weekly_hours) || 0
   };
   cachedMonitors = [newMonitor, ...cachedMonitors];
@@ -673,7 +697,8 @@ function renderCensus() {
 $("census-form")?.addEventListener("submit", e => {
   e.preventDefault();
   const data = formObject(e.target);
-  const school = cachedSchools.find(s => s.id === data.school_id);
+  const targetSchoolId = isSecretaria() ? data.school_id : selectedSchoolId;
+  const school = cachedSchools.find(s => s.id === targetSchoolId);
   if (!school) {
     notice("Selecione uma unidade escolar válida para o Censo.", true);
     return;
@@ -799,6 +824,12 @@ async function insertForm(formId, table, transform=(x)=>x, onSuccess=null) {
       form.reset();
       document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
       if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
+      if (selectedSchoolId) {
+        if ($("student-school")) $("student-school").value = selectedSchoolId;
+        if ($("class-school")) $("class-school").value = selectedSchoolId;
+        if ($("monitor-school")) $("monitor-school").value = selectedSchoolId;
+        if ($("census-school")) $("census-school").value = selectedSchoolId;
+      }
       notice("Registro salvo com sucesso.");
       await loadAll();
       if (onSuccess && data) onSuccess(data);
@@ -823,6 +854,7 @@ insertForm("school-form", "schools", x => ({
 
 insertForm("student-form", "students", x => ({
   ...x,
+  school_id: isSecretaria() ? x.school_id : selectedSchoolId,
   birth_date: x.birth_date || null,
   guardian_name: x.guardian_name || null,
   guardian_phone: x.guardian_phone || null,
@@ -830,6 +862,7 @@ insertForm("student-form", "students", x => ({
 }));
 insertForm("class-form", "classes", x => ({
   ...x,
+  school_id: isSecretaria() ? x.school_id : selectedSchoolId,
   school_year: Number(x.school_year),
   teacher_id: x.teacher_id || null
 }));
@@ -844,13 +877,11 @@ insertForm("lesson-form", "lessons", x => ({
 
 async function loadLessons() {
   try {
-    let query = supabase
+    const { data, error } = await supabase
       .from("lessons")
       .select("class_id,lesson_date,subject,content,classes(name,school_id)")
       .order("lesson_date", { ascending: false })
       .limit(50);
-
-    const { data, error } = await query;
     if (error) throw error;
     const rows = (data || []).filter(l => !selectedSchoolId || l.classes?.school_id === selectedSchoolId);
     $("lessons-body").innerHTML = rows.map(l =>
