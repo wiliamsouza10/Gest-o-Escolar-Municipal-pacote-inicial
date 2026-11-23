@@ -18,21 +18,21 @@ let selectedSchoolId = "";
 let cachedSchools = [], cachedStudents = [], cachedClasses = [], cachedEnrollments = [], cachedProfiles = [];
 let attendanceRows = [];
 
-const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v1";
+const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v2";
+const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
 const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v1";
 
 const defaultCurriculum = [
-  { id: "curr-1", stage: "Educação Infantil", subject: "O eu, o outro e o nós", area: "Campos de Experiência", annual_hours: 800 },
-  { id: "curr-2", stage: "Educação Infantil", subject: "Corpo, gestos e movimentos", area: "Campos de Experiência", annual_hours: 800 },
-  { id: "curr-3", stage: "Ensino Fundamental I (1º ao 5º ano)", subject: "Língua Portuguesa", area: "Linguagens", annual_hours: 240 },
-  { id: "curr-4", stage: "Ensino Fundamental I (1º ao 5º ano)", subject: "Matemática", area: "Matemática", annual_hours: 240 },
-  { id: "curr-5", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "Língua Portuguesa", area: "Linguagens", annual_hours: 200 },
-  { id: "curr-6", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "Matemática", area: "Matemática", annual_hours: 200 },
-  { id: "curr-7", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "Ciências", area: "Ciências da Natureza", annual_hours: 120 },
-  { id: "curr-8", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "História / Geografia", area: "Ciências Humanas", annual_hours: 160 }
+  { id: "curr-1", stage: "Educação Infantil", subject: "O eu, o outro e o nós", area: "Campos de Experiência", requirement_type: "obrigatoria", annual_hours: 800 },
+  { id: "curr-2", stage: "Educação Infantil", subject: "Corpo, gestos e movimentos", area: "Campos de Experiência", requirement_type: "obrigatoria", annual_hours: 800 },
+  { id: "curr-3", stage: "Ensino Fundamental I (1º ao 5º ano)", subject: "Língua Portuguesa", area: "Linguagens", requirement_type: "obrigatoria", annual_hours: 240 },
+  { id: "curr-4", stage: "Ensino Fundamental I (1º ao 5º ano)", subject: "Matemática", area: "Matemática", requirement_type: "obrigatoria", annual_hours: 240 },
+  { id: "curr-5", stage: "Ensino Fundamental I (1º ao 5º ano)", subject: "Oficina de Leitura e Contação de Histórias", area: "Atividades Complementares", requirement_type: "complementar_nao_obrigatoria", annual_hours: 80 },
+  { id: "curr-6", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "Robótica Educacional e Iniciação Científica", area: "Cultura Digital / Ciências", requirement_type: "complementar_nao_obrigatoria", annual_hours: 80 }
 ];
 
 let cachedCurriculum = loadLocalJson(CURRICULUM_STORAGE_KEY, defaultCurriculum);
+let cachedMonitors = loadLocalJson(MONITORS_STORAGE_KEY, []);
 let cachedCensus = loadLocalJson(CENSUS_STORAGE_KEY, []);
 
 const $ = (id) => document.getElementById(id);
@@ -41,7 +41,8 @@ const roleNames = {
   secretaria: "Secretaria de Educação",
   gestor: "Gestor escolar",
   secretario_escolar: "Secretário escolar",
-  professor: "Professor"
+  professor: "Professor",
+  monitor_complementar: "Monitor de atividade complementar"
 };
 
 function loadLocalJson(key, fallback) {
@@ -63,6 +64,10 @@ function saveLocalJson(key, value) {
 
 function isSecretaria() {
   return currentProfile?.role === "secretaria";
+}
+
+function canManageCurriculumAndMonitors() {
+  return isSecretaria() || currentProfile?.role === "gestor";
 }
 
 function getActiveSchool() {
@@ -124,14 +129,18 @@ function go(page) {
     matriculas: "Matrículas",
     turmas: "Turmas",
     diario: "Diário de classe",
-    matriz: "Matriz curricular por etapa",
+    matriz: "Matriz curricular e atividades complementares",
     censo: "Mapeamento do Censo Escolar",
     relatorios: "Relatórios",
     usuarios: "Cadastro de usuários"
   })[page] || "Gestão Escolar";
   if (page === "diario") loadLessons();
   if (page === "usuarios") loadProfiles();
-  if (page === "matriz") renderCurriculum();
+  if (page === "matriz") {
+    fillMonitorSubjectSelect();
+    renderCurriculum();
+    renderMonitors();
+  }
   if (page === "censo") renderCensus();
 }
 document.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.page)));
@@ -281,6 +290,7 @@ function applySchoolScope() {
   renderEnrollments(scopedEnrollments);
   fillSelects(scopedStudents, scopedClasses);
   renderUsers();
+  renderMonitors();
   renderCensus();
   loadLessons();
 }
@@ -339,24 +349,27 @@ function fillSelect(id, items, labelFn, placeholder="Selecione") {
   if (!el) return;
   const old = el.value;
   el.innerHTML = `<option value="">${placeholder}</option>` +
-    items.map(x => `<option value="${x.id}">${escapeHtml(labelFn(x))}</option>`).join("");
+    items.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(labelFn(x))}</option>`).join("");
   if (items.some(x => x.id === old)) el.value = old;
 }
 function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getScopedClasses()) {
   fillSelect("student-school", cachedSchools, x => x.name);
   fillSelect("class-school", cachedSchools, x => x.name);
   fillSelect("user-school", cachedSchools, x => x.name, "Rede / Não vinculada");
+  fillSelect("monitor-school", cachedSchools, x => x.name, "Rede / Todas as escolas");
   fillSelect("census-school", cachedSchools, x => formatSchoolOption(x), "Selecione a escola");
   fillSelect("enrollment-student", scopedStudents, x => x.full_name);
   fillSelect("enrollment-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
   fillSelect("diary-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
   fillSelect("attendance-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
   fillTeacherSelect();
+  fillMonitorSubjectSelect();
 
   if (selectedSchoolId) {
     if ($("student-school")) $("student-school").value = selectedSchoolId;
     if ($("class-school")) $("class-school").value = selectedSchoolId;
     if ($("user-school")) $("user-school").value = selectedSchoolId;
+    if ($("monitor-school")) $("monitor-school").value = selectedSchoolId;
     if ($("census-school")) $("census-school").value = selectedSchoolId;
   }
 }
@@ -459,15 +472,42 @@ function renderUsers() {
   }).join("") || '<tr><td colspan="4">Nenhum usuário cadastrado.</td></tr>';
 }
 
-// --- MATRIZ CURRICULAR POR ETAPA DE ENSINO ---
+// --- MATRIZ CURRICULAR (OBRIGATÓRIA E COMPLEMENTAR NÃO OBRIGATÓRIA) ---
+function formatRequirementLabel(type) {
+  return type === "complementar_nao_obrigatoria"
+    ? "Complementar (Não obrigatória)"
+    : "Obrigatória";
+}
+
+function fillMonitorSubjectSelect() {
+  const select = $("monitor-subject-select");
+  if (!select) return;
+  const currentVal = select.value;
+  const complementaryItems = cachedCurriculum.filter(
+    item => item.requirement_type === "complementar_nao_obrigatoria"
+  );
+  const uniqueSubjects = Array.from(new Set(complementaryItems.map(x => x.subject)));
+
+  select.innerHTML = `<option value="">Selecione a atividade complementar</option>` +
+    uniqueSubjects.map(subj => `<option value="${escapeHtml(subj)}">${escapeHtml(subj)}</option>`).join("");
+
+  if (uniqueSubjects.includes(currentVal)) {
+    select.value = currentVal;
+  }
+}
+
 function renderCurriculum() {
   if (!$("curriculum-body")) return;
   const filterStage = $("curriculum-filter-stage")?.value || "";
-  const items = filterStage
-    ? cachedCurriculum.filter(item => item.stage === filterStage)
-    : cachedCurriculum;
+  const filterReq = $("curriculum-filter-requirement")?.value || "";
 
-  const canManage = isSecretaria() || currentProfile?.role === "gestor";
+  const items = cachedCurriculum.filter(item => {
+    const stageOk = !filterStage || item.stage === filterStage;
+    const reqOk = !filterReq || (item.requirement_type || "obrigatoria") === filterReq;
+    return stageOk && reqOk;
+  });
+
+  const canManage = canManageCurriculumAndMonitors();
   $("curriculum-body").innerHTML = items.map(item => {
     const delBtn = canManage
       ? `<button type="button" class="secondary small" data-delete-curriculum="${escapeHtml(item.id)}">Remover</button>`
@@ -476,48 +516,125 @@ function renderCurriculum() {
       <td>${escapeHtml(item.stage)}</td>
       <td>${escapeHtml(item.subject)}</td>
       <td>${escapeHtml(item.area || "—")}</td>
+      <td>${escapeHtml(formatRequirementLabel(item.requirement_type))}</td>
       <td>${escapeHtml(String(item.annual_hours))}h</td>
       <td>${delBtn}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="5">Nenhum componente curricular cadastrado para esta etapa.</td></tr>';
+  }).join("") || '<tr><td colspan="6">Nenhum componente ou atividade encontrado com o filtro selecionado.</td></tr>';
 }
 
 $("curriculum-filter-stage")?.addEventListener("change", renderCurriculum);
+$("curriculum-filter-requirement")?.addEventListener("change", renderCurriculum);
 
 $("curriculum-form")?.addEventListener("submit", e => {
   e.preventDefault();
-  if (!isSecretaria() && currentProfile?.role !== "gestor") {
+  if (!canManageCurriculumAndMonitors()) {
     notice("Apenas Secretaria ou Gestor podem alterar a matriz curricular.", true);
     return;
   }
   const data = formObject(e.target);
+  const requirementType = data.requirement_type || "obrigatoria";
   const newItem = {
     id: `curr-${Date.now()}`,
     stage: data.stage,
     subject: String(data.subject || "").trim(),
-    area: String(data.area || "").trim() || "Formação Geral Básica",
+    area: String(data.area || "").trim() || (requirementType === "complementar_nao_obrigatoria" ? "Atividades Complementares" : "Formação Geral Básica"),
+    requirement_type: requirementType,
     annual_hours: Number(data.annual_hours) || 0
   };
   cachedCurriculum = [newItem, ...cachedCurriculum];
   saveLocalJson(CURRICULUM_STORAGE_KEY, cachedCurriculum);
   e.target.reset();
   if ($("curriculum-stage-select")) $("curriculum-stage-select").value = newItem.stage;
+  if ($("curriculum-requirement-select")) $("curriculum-requirement-select").value = requirementType;
+  fillMonitorSubjectSelect();
   renderCurriculum();
-  notice("Componente adicionado à matriz curricular.");
+  notice(
+    requirementType === "complementar_nao_obrigatoria"
+      ? "Atividade complementar (não obrigatória) adicionada à matriz."
+      : "Componente obrigatório adicionado à matriz curricular."
+  );
 });
 
 $("curriculum-body")?.addEventListener("click", e => {
   const btn = e.target.closest("[data-delete-curriculum]");
   if (!btn) return;
-  if (!isSecretaria() && currentProfile?.role !== "gestor") {
+  if (!canManageCurriculumAndMonitors()) {
     notice("Apenas Secretaria ou Gestor podem remover itens da matriz curricular.", true);
     return;
   }
   const id = btn.dataset.deleteCurriculum;
   cachedCurriculum = cachedCurriculum.filter(x => x.id !== id);
   saveLocalJson(CURRICULUM_STORAGE_KEY, cachedCurriculum);
+  fillMonitorSubjectSelect();
   renderCurriculum();
-  notice("Componente removido da matriz curricular.");
+  notice("Item removido da matriz curricular.");
+});
+
+// --- MONITORES DAS DISCIPLINAS COMPLEMENTARES ---
+function renderMonitors() {
+  if (!$("monitors-body")) return;
+  const rows = selectedSchoolId
+    ? cachedMonitors.filter(m => !m.school_id || m.school_id === selectedSchoolId)
+    : cachedMonitors;
+
+  const canManage = canManageCurriculumAndMonitors();
+  $("monitors-body").innerHTML = rows.map(m => {
+    const school = cachedSchools.find(s => s.id === m.school_id);
+    const schoolLabel = school ? school.name : "Rede / Todas as escolas";
+    const delBtn = canManage
+      ? `<button type="button" class="secondary small" data-delete-monitor="${escapeHtml(m.id)}">Remover</button>`
+      : `<span class="muted small">—</span>`;
+    return `<tr>
+      <td>${escapeHtml(m.monitor_name)}</td>
+      <td>${escapeHtml(m.subject)}</td>
+      <td>${escapeHtml(m.stage)}</td>
+      <td>${escapeHtml(schoolLabel)}</td>
+      <td>${escapeHtml(String(m.weekly_hours))}h/sem</td>
+      <td>${delBtn}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="6">Nenhum monitor de atividade complementar cadastrado.</td></tr>';
+}
+
+$("monitor-form")?.addEventListener("submit", e => {
+  e.preventDefault();
+  if (!canManageCurriculumAndMonitors()) {
+    notice("Apenas Secretaria ou Gestor podem cadastrar monitores.", true);
+    return;
+  }
+  const data = formObject(e.target);
+  if (!data.subject) {
+    notice("Selecione uma atividade complementar cadastrada na matriz curricular.", true);
+    return;
+  }
+  const newMonitor = {
+    id: `mon-${Date.now()}`,
+    monitor_name: String(data.monitor_name || "").trim(),
+    subject: String(data.subject || "").trim(),
+    stage: data.stage,
+    school_id: data.school_id || null,
+    weekly_hours: Number(data.weekly_hours) || 0
+  };
+  cachedMonitors = [newMonitor, ...cachedMonitors];
+  saveLocalJson(MONITORS_STORAGE_KEY, cachedMonitors);
+  e.target.reset();
+  if (selectedSchoolId && $("monitor-school")) $("monitor-school").value = selectedSchoolId;
+  renderMonitors();
+  notice("Monitor de atividade complementar cadastrado com sucesso.");
+});
+
+$("monitors-body")?.addEventListener("click", e => {
+  const btn = e.target.closest("[data-delete-monitor]");
+  if (!btn) return;
+  if (!canManageCurriculumAndMonitors()) {
+    notice("Apenas Secretaria ou Gestor podem remover monitores.", true);
+    return;
+  }
+  const id = btn.dataset.deleteMonitor;
+  cachedMonitors = cachedMonitors.filter(x => x.id !== id);
+  saveLocalJson(MONITORS_STORAGE_KEY, cachedMonitors);
+  renderMonitors();
+  notice("Monitor removido.");
 });
 
 // --- MAPEAMENTO DO CENSO ESCOLAR ---
@@ -727,11 +844,13 @@ insertForm("lesson-form", "lessons", x => ({
 
 async function loadLessons() {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("lessons")
       .select("class_id,lesson_date,subject,content,classes(name,school_id)")
       .order("lesson_date", { ascending: false })
       .limit(50);
+
+    const { data, error } = await query;
     if (error) throw error;
     const rows = (data || []).filter(l => !selectedSchoolId || l.classes?.school_id === selectedSchoolId);
     $("lessons-body").innerHTML = rows.map(l =>
