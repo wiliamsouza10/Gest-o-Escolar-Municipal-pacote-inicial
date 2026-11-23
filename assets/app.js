@@ -6,6 +6,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 */
 const SUPABASE_URL = "https://xkuypxublyyrevrmaale.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_AK9mLZ12c6fUaltPDtTD2Q_oNfG6sXD";
+const CREATE_USER_FUNCTION = "create-user";
 
 // Verificação corrigida: valida se há URL HTTPS e chave pública preenchidas
 const configured =
@@ -14,7 +15,7 @@ const configured =
 
 const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 let currentProfile = null;
-let cachedSchools = [], cachedStudents = [], cachedClasses = [];
+let cachedSchools = [], cachedStudents = [], cachedClasses = [], cachedProfiles = [];
 let attendanceRows = [];
 
 const $ = (id) => document.getElementById(id);
@@ -42,8 +43,9 @@ function go(page){
   document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
   $("page-"+page)?.classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active",n.dataset.page===page));
-  $("page-title").textContent=({inicio:"Painel inicial",escolas:"Unidades escolares",alunos:"Cadastro de alunos",matriculas:"Matrículas",turmas:"Turmas",diario:"Diário de classe",relatorios:"Relatórios"})[page]||"Gestão Escolar";
+  $("page-title").textContent=({inicio:"Painel inicial",escolas:"Unidades escolares",alunos:"Cadastro de alunos",matriculas:"Matrículas",turmas:"Turmas",diario:"Diário de classe",relatorios:"Relatórios",usuarios:"Cadastro de usuários"})[page]||"Gestão Escolar";
   if(page==="diario") loadLessons();
+  if(page==="usuarios") loadProfiles();
 }
 document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>go(b.dataset.page)));
 document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.goto)));
@@ -71,6 +73,20 @@ async function fetchRows(table,select="*"){
   const {data,error}=await supabase.from(table).select(select).order("created_at",{ascending:false}).limit(500);
   if(error) throw error; return data||[];
 }
+async function loadProfiles(){
+  if(!$("users-body")) return;
+  try{
+    const {data,error}=await supabase.from("profiles").select("*, schools(name)").order("full_name",{ascending:true}).limit(500);
+    if(error) throw error;
+    cachedProfiles=data||[];
+    renderUsers();
+    fillSelect("class-teacher",cachedProfiles.filter(p=>p.role==="professor"),x=>x.full_name||"Professor sem nome","Não definido");
+  }catch(e){
+    console.warn("Não foi possível carregar perfis:",e);
+    fillSelect("class-teacher",[],x=>x.full_name,"Não definido");
+    $("users-body").innerHTML='<tr><td colspan="3">Não foi possível carregar os usuários. Verifique as permissões da tabela profiles.</td></tr>';
+  }
+}
 async function loadAll(){
   try{
     const [schools,students,classes,enrollments]=await Promise.all([
@@ -81,6 +97,7 @@ async function loadAll(){
     $("stat-turmas").textContent=classes.length;$("stat-matriculas").textContent=enrollments.filter(x=>x.status==="ativa").length;
     $("report-students").textContent=students.length;$("report-classes").textContent=classes.length;$("report-enrollments").textContent=enrollments.filter(x=>x.status==="ativa").length;
     renderSchools();renderStudents();renderClasses();renderEnrollments(enrollments);fillSelects();
+    await loadProfiles();
   }catch(e){notice("Não foi possível carregar os dados. Verifique as políticas de acesso e a conexão com o banco.",true);console.error(e);}
 }
 function fillSelect(id,items,labelFn,placeholder="Selecione"){
@@ -91,16 +108,69 @@ function fillSelect(id,items,labelFn,placeholder="Selecione"){
 function fillSelects(){
   fillSelect("student-school",cachedSchools,x=>x.name);
   fillSelect("class-school",cachedSchools,x=>x.name);
+  fillSelect("user-school",cachedSchools,x=>x.name,"Rede / Não vinculada");
   fillSelect("enrollment-student",cachedStudents,x=>x.full_name);
   fillSelect("enrollment-class",cachedClasses,x=>`${x.name} — ${x.grade_level}`);
   fillSelect("diary-class",cachedClasses,x=>`${x.name} — ${x.grade_level}`);
   fillSelect("attendance-class",cachedClasses,x=>`${x.name} — ${x.grade_level}`);
-  fillSelect("class-teacher",[],x=>x.full_name,"Cadastre/atribua professor pelo administrador");
+  fillSelect("class-teacher",cachedProfiles.filter(p=>p.role==="professor"),x=>x.full_name||"Professor sem nome","Não definido");
 }
 function renderSchools(){ $("schools-body").innerHTML=cachedSchools.map(s=>`<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.inep_code||"—")}</td><td>${escapeHtml(s.address||"—")}</td><td>${escapeHtml(s.phone||"—")}</td></tr>`).join("")||'<tr><td colspan="4">Nenhuma escola cadastrada.</td></tr>'; }
 function renderStudents(){ $("students-body").innerHTML=cachedStudents.map(s=>`<tr><td>${escapeHtml(s.full_name)}</td><td>${escapeHtml(s.birth_date||"—")}</td><td>${escapeHtml(s.guardian_name||"—")}</td><td>${escapeHtml(s.schools?.name||"—")}</td></tr>`).join("")||'<tr><td colspan="4">Nenhum aluno cadastrado.</td></tr>'; }
 function renderClasses(){ $("classes-body").innerHTML=cachedClasses.map(c=>`<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.grade_level)}</td><td>${escapeHtml(c.shift)}</td><td>${c.school_year}</td><td>${escapeHtml(c.schools?.name||"—")}</td></tr>`).join("")||'<tr><td colspan="5">Nenhuma turma cadastrada.</td></tr>'; }
 function renderEnrollments(rows){ $("enrollments-body").innerHTML=rows.map(e=>`<tr><td>${escapeHtml(e.students?.full_name||"—")}</td><td>${escapeHtml(e.classes?.name||"—")}</td><td>${e.school_year}</td><td>${escapeHtml(e.status)}</td></tr>`).join("")||'<tr><td colspan="4">Nenhuma matrícula cadastrada.</td></tr>'; }
+function renderUsers(){
+  if(!$("users-body")) return;
+  $("users-body").innerHTML=cachedProfiles.map(u=>`<tr><td>${escapeHtml(u.full_name||"—")}</td><td>${escapeHtml(roleNames[u.role]||u.role||"—")}</td><td>${escapeHtml(u.schools?.name||"Rede / Não vinculada")}</td></tr>`).join("")||'<tr><td colspan="3">Nenhum usuário cadastrado.</td></tr>';
+}
+
+const userForm = $("user-form");
+if (userForm) {
+  userForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (currentProfile?.role !== "secretaria") {
+      notice("Apenas o perfil Secretaria de Educação pode cadastrar novos usuários.", true);
+      return;
+    }
+
+    const payload = formObject(userForm);
+    const body = {
+      full_name: payload.full_name?.trim(),
+      email: payload.email?.trim().toLowerCase(),
+      password: payload.password,
+      role: payload.role,
+      school_id: payload.school_id || null
+    };
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/${CREATE_USER_FUNCTION}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "apikey": SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify(body)
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Não foi possível criar o usuário.");
+      }
+
+      userForm.reset();
+      notice("Usuário cadastrado com sucesso.");
+      await loadProfiles();
+    } catch (err) {
+      console.error(err);
+      notice(err.message || "Erro ao cadastrar usuário. Verifique a Edge Function no Supabase.", true);
+    }
+  });
+}
 
 async function insertForm(formId,table,transform=(x)=>x){
   const form=$(formId);form.addEventListener("submit",async e=>{
