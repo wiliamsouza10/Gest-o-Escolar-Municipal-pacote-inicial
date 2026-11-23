@@ -36,6 +36,7 @@
         <button class="nav-item" data-page="turmas" data-roles="secretaria,gestor,secretario_escolar">▥ <span>Turmas</span></button>
         <button class="nav-item" data-page="diario" data-roles="secretaria,gestor,professor">▧ <span>Diário de classe</span></button>
         <button class="nav-item" data-page="relatorios" data-roles="secretaria,gestor">▤ <span>Relatórios</span></button>
+        <button class="nav-item" data-page="usuarios" data-roles="secretaria">👤 <span>Usuários</span></button>
       </nav>
       <button id="logout" class="logout">↪ Sair</button>
     </aside>
@@ -143,6 +144,47 @@
           <p class="muted small">Os indicadores são calculados a partir dos registros disponíveis para seu perfil. Para relatórios oficiais, valide os dados com a escrituração escolar.</p>
         </div>
       </section>
+
+      <section id="page-usuarios" class="page hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Cadastro de usuários</h3>
+              <p class="muted">Crie contas de acesso para gestores, secretários escolares, professores ou equipe da secretaria.</p>
+            </div>
+          </div>
+          <form id="user-form" class="form-grid">
+            <label>Nome completo<input name="full_name" required maxlength="160" placeholder="Ex.: Maria Oliveira"></label>
+            <label>E-mail institucional<input name="email" type="email" required maxlength="160" placeholder="maria@escola.gov.br"></label>
+            <label>Senha inicial<input name="password" type="password" required minlength="6" placeholder="Mínimo 6 caracteres"></label>
+            <label>Perfil de acesso
+              <select name="role" required>
+                <option value="professor">Professor</option>
+                <option value="secretario_escolar">Secretário escolar</option>
+                <option value="gestor">Gestor escolar</option>
+                <option value="secretaria">Secretaria de Educação</option>
+              </select>
+            </label>
+            <label>Escola vinculada (opcional)
+              <select name="school_id" id="user-school">
+                <option value="">Rede / Não vinculada</option>
+              </select>
+            </label>
+            <button class="primary" type="submit">Cadastrar usuário</button>
+          </form>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Nome</th><th>Perfil</th><th>Escola</th></tr>
+              </thead>
+              <tbody id="users-body">
+                <tr><td colspan="3">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <footer>Gestão Escolar Municipal · Ambiente de uso institucional</footer>
     </main>
   </div>
