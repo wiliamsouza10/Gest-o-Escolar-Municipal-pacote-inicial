@@ -1,4 +1,3 @@
-HTML
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -131,8 +130,17 @@ HTML
       <section id="page-turmas" class="page hidden">
         <div class="panel"><div class="panel-head"><div><h3>Turmas</h3><p class="muted">Organização por etapa, ano e turno.</p></div></div>
           <form id="class-form" class="form-grid">
-            <label>Nome da turma<input name="name" required placeholder="Ex.: 5º ano A"></label>
-            <label>Etapa<input name="grade_level" required placeholder="Ex.: 5º ano do Ensino Fundamental"></label>
+            <label>Nome da turma<input name="name" required placeholder="Ex.: 5º ano A ou Creche I A"></label>
+            <label>Etapa
+              <select name="grade_level" required>
+                <option value="">Selecione a etapa</option>
+                <option value="Creche">Creche</option>
+                <option value="Pré-escola">Pré-escola</option>
+                <option value="Fundamental I">Fundamental I</option>
+                <option value="Fundamental II">Fundamental II</option>
+                <option value="EJA">EJA</option>
+              </select>
+            </label>
             <label>Turno
               <select name="shift">
                 <option value="Matutino">Matutino</option>
