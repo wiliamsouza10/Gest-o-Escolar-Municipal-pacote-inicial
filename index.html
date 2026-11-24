@@ -128,33 +128,177 @@
       </section>
 
       <section id="page-turmas" class="page hidden">
-        <div class="panel"><div class="panel-head"><div><h3>Turmas</h3><p class="muted">Organização por etapa, ano e turno.</p></div></div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Cadastrar turma</h3>
+              <p class="muted">Organização por etapa, modalidade, mediação, horário, currículo e vínculos.</p>
+            </div>
+          </div>
           <form id="class-form" class="form-grid">
-            <label>Nome da turma<input name="name" required placeholder="Ex.: 5º ano A ou Creche I A"></label>
-            <label>Etapa
-              <select name="grade_level" required>
-                <option value="">Selecione a etapa</option>
-                <option value="Creche">Creche</option>
-                <option value="Pré-escola">Pré-escola</option>
-                <option value="Fundamental I">Fundamental I</option>
-                <option value="Fundamental II">Fundamental II</option>
-                <option value="EJA">EJA</option>
+            <label>Nome turma
+              <input name="name" required maxlength="160" placeholder="Ex.: 5º ano A">
+            </label>
+            <label>Quant. Alunos
+              <input name="max_students" type="number" min="1" max="200" value="30" required>
+            </label>
+            <label>Comp. Turma
+              <input name="class_complement" maxlength="30" placeholder="Ex: A, B...">
+            </label>
+            <label>Cód. INEP
+              <input name="inep_code" maxlength="30" placeholder="Código INEP da turma">
+            </label>
+
+            <label>Modalidade
+              <select name="modality" required>
+                <option value="Regular" selected>Regular</option>
+                <option value="Educação Especial">Educação Especial</option>
+                <option value="Educação de Jovens e Adultos (EJA)">Educação de Jovens e Adultos (EJA)</option>
+                <option value="Educação Profissional">Educação Profissional</option>
               </select>
             </label>
+            <label>Etapa
+              <select name="grade_level" required>
+                <option value="">Selecione uma etapa de ensino</option>
+                <option value="Educação Infantil - Creche (0 a 3 anos)">Educação Infantil - Creche (0 a 3 anos)</option>
+                <option value="Educação Infantil - Pré-escola (4 e 5 anos)">Educação Infantil - Pré-escola (4 e 5 anos)</option>
+                <option value="Educação Infantil - Unificada (0 a 5 anos)">Educação Infantil - Unificada (0 a 5 anos)</option>
+                <option value="Educação Infantil e Ensino Fundamental (8 e 9 anos) Multietapa">Educação Infantil e Ensino Fundamental (8 e 9 anos) Multietapa</option>
+                <option value="Ensino Fundamental de 9 anos - 1º Ano">Ensino Fundamental de 9 anos - 1º Ano</option>
+                <option value="Ensino Fundamental de 9 anos - 2º Ano">Ensino Fundamental de 9 anos - 2º Ano</option>
+                <option value="Ensino Fundamental de 9 anos - 3º Ano">Ensino Fundamental de 9 anos - 3º Ano</option>
+                <option value="Ensino Fundamental de 9 anos - 4º Ano">Ensino Fundamental de 9 anos - 4º Ano</option>
+                <option value="Ensino Fundamental de 9 anos - 5º Ano">Ensino Fundamental de 9 anos - 5º Ano</option>
+                <option value="Ensino Fundamental de 9 anos - 6º Ano">Ensino Fundamental de 9 anos - 6º Ano</option>
+                <option value="Ensino Fundamental de 9 anos - 7º Ano">Ensino Fundamental de 9 anos - 7º Ano</option>
+                <option value="Ensino Fundamental de 9 anos - 8º Ano">Ensino Fundamental de 9 anos - 8º Ano</option>
+                <option value="Ensino Fundamental de 9 anos - 9º Ano">Ensino Fundamental de 9 anos - 9º Ano</option>
+                <option value="Ensino Fundamental de 9 anos - Multi">Ensino Fundamental de 9 anos - Multi</option>
+                <option value="EJA - Ensino Fundamental (Anos Iniciais)">EJA - Ensino Fundamental (Anos Iniciais)</option>
+                <option value="EJA - Ensino Fundamental (Anos Finais)">EJA - Ensino Fundamental (Anos Finais)</option>
+              </select>
+            </label>
+            <label>Tipo de mediação didático-pedagógica
+              <select name="mediation_type" required>
+                <option value="Presencial" selected>Presencial</option>
+                <option value="Semipresencial">Semipresencial</option>
+                <option value="Educação a distância">Educação a distância</option>
+              </select>
+            </label>
+
+            <label>Escolarização
+              <select name="schooling" required>
+                <option value="Sim" selected>Sim</option>
+                <option value="Não">Não</option>
+              </select>
+            </label>
+            <label>Atividade Complementar
+              <select name="complementary_activity" required>
+                <option value="Não" selected>Não</option>
+                <option value="Sim">Sim</option>
+              </select>
+            </label>
+            <label>Currículo
+              <select name="curriculum_type" required>
+                <option value="Comum" selected>Comum</option>
+                <option value="Diversificado">Diversificado</option>
+                <option value="Comum e Diversificado">Comum e Diversificado</option>
+              </select>
+            </label>
+            <label>Horário Inicial
+              <input name="start_time" type="time">
+            </label>
+            <label>Horário Final
+              <input name="end_time" type="time">
+            </label>
+
+            <label>Tolerância de atraso
+              <select name="late_tolerance" required>
+                <option value="Padrão do sistema" selected>Padrão do sistema</option>
+                <option value="Sem tolerância">Sem tolerância</option>
+                <option value="5 minutos">5 minutos</option>
+                <option value="10 minutos">10 minutos</option>
+                <option value="15 minutos">15 minutos</option>
+                <option value="20 minutos">20 minutos</option>
+                <option value="30 minutos">30 minutos</option>
+              </select>
+            </label>
+            <label>Aten. educacional especializado - AEE
+              <select name="aee_service" required>
+                <option value="Não" selected>Não</option>
+                <option value="Sim">Sim</option>
+              </select>
+            </label>
+            <label>Local de funcionamento diferenciado
+              <select name="differentiated_location" required>
+                <option value="A turma não está em local de funcionamento diferenciado" selected>A turma não está em local de funcionamento diferenciado</option>
+                <option value="Unidade de atendimento socioeducativo">Unidade de atendimento socioeducativo</option>
+                <option value="Unidade prisional">Unidade prisional</option>
+                <option value="Sala anexa">Sala anexa</option>
+                <option value="Assentamento">Assentamento</option>
+                <option value="Terra indígena">Terra indígena</option>
+                <option value="Comunidade quilombola">Comunidade quilombola</option>
+              </select>
+            </label>
+
+            <label>Língua Portuguesa como Segunda Língua
+              <select name="portuguese_second_language" required>
+                <option value="Não oferece disciplina" selected>Não oferece disciplina</option>
+                <option value="Oferece disciplina">Oferece disciplina</option>
+              </select>
+            </label>
+            <label>Estágio Curricular Supervisionado
+              <select name="supervised_internship" required>
+                <option value="Não oferece disciplina" selected>Não oferece disciplina</option>
+                <option value="Oferece disciplina">Oferece disciplina</option>
+              </select>
+            </label>
+
+            <label style="grid-column: 1 / -1;">Classe bilíngue de surdos tendo a Libras (Língua Brasileira de Sinais) como língua de instrução, ensino, comunicação e interação e a língua portuguesa escrita como segunda língua
+              <select name="bilingual_deaf_class" required>
+                <option value="Não" selected>Não</option>
+                <option value="Sim">Sim</option>
+              </select>
+            </label>
+
             <label>Turno
-              <select name="shift">
+              <select name="shift" required>
                 <option value="Matutino">Matutino</option>
                 <option value="Vespertino">Vespertino</option>
                 <option value="Noturno">Noturno</option>
                 <option value="Integral">Integral</option>
               </select>
             </label>
-            <label>Ano letivo<input name="school_year" type="number" min="2020" max="2100" required></label>
-            <label>Escola<select name="school_id" id="class-school" required><option value="">Selecione</option></select></label>
-            <label>Professor responsável<select name="teacher_id" id="class-teacher"><option value="">Não definido</option></select></label>
+            <label>Ano letivo
+              <input name="school_year" type="number" min="2020" max="2100" required>
+            </label>
+            <label>Escola
+              <select name="school_id" id="class-school" required><option value="">Selecione</option></select>
+            </label>
+            <label>Professor responsável
+              <select name="teacher_id" id="class-teacher"><option value="">Não definido</option></select>
+            </label>
             <button class="primary" type="submit">Criar turma</button>
           </form>
-          <div class="table-wrap"><table><thead><tr><th>Turma</th><th>Etapa</th><th>Turno</th><th>Ano</th><th>Escola</th><th>Professor</th></tr></thead><tbody id="classes-body"><tr><td colspan="6">Carregando...</td></tr></tbody></table></div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Turma</th>
+                  <th>Comp.</th>
+                  <th>Etapa</th>
+                  <th>Modalidade</th>
+                  <th>Mediação</th>
+                  <th>Horário</th>
+                  <th>Ano</th>
+                  <th>Escola</th>
+                  <th>Professor</th>
+                </tr>
+              </thead>
+              <tbody id="classes-body"><tr><td colspan="9">Carregando...</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
