@@ -503,6 +503,11 @@ function fillSelect(id, items, labelFn, placeholder = "Selecione") {
   if (items.some(x => x.id === old)) el.value = old;
 }
 
+function formatClassLabel(c) {
+  const comp = c.class_complement ? ` (${c.class_complement})` : "";
+  return `${c.name}${comp} — ${c.grade_level}`;
+}
+
 function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getScopedClasses()) {
   const effectiveId = getEffectiveSchoolId();
   const availableSchools = isSecretaria()
@@ -515,9 +520,9 @@ function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getSc
   fillSelect("monitor-school", availableSchools, x => x.name, isSecretaria() ? "Rede / Todas as escolas" : "Selecione a escola");
   fillSelect("census-school", availableSchools, x => formatSchoolOption(x), "Selecione a escola");
   fillSelect("enrollment-student", scopedStudents, x => x.full_name);
-  fillSelect("enrollment-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
-  fillSelect("diary-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
-  fillSelect("attendance-class", scopedClasses, x => `${x.name} — ${x.grade_level}`);
+  fillSelect("enrollment-class", scopedClasses, x => formatClassLabel(x));
+  fillSelect("diary-class", scopedClasses, x => formatClassLabel(x));
+  fillSelect("attendance-class", scopedClasses, x => formatClassLabel(x));
   fillTeacherSelect();
   fillMonitorSubjectSelect();
 
@@ -604,6 +609,13 @@ function renderStudents(rows = getScopedStudents()) {
   ).join("") || '<tr><td colspan="5">Nenhum aluno cadastrado.</td></tr>';
 }
 
+function formatSchedule(startTime, endTime) {
+  if (startTime && endTime) return `${startTime.slice(0, 5)} - ${endTime.slice(0, 5)}`;
+  if (startTime) return `${startTime.slice(0, 5)} - —`;
+  if (endTime) return `— - ${endTime.slice(0, 5)}`;
+  return "—";
+}
+
 function renderClasses(rows = getScopedClasses()) {
   if (!$("classes-body")) return;
   const canAssignTeacher = canManageClassesAndEnrollments();
@@ -619,13 +631,16 @@ function renderClasses(rows = getScopedClasses()) {
 
     return `<tr>
       <td>${escapeHtml(c.name)}</td>
+      <td>${escapeHtml(c.class_complement || "—")}</td>
       <td>${escapeHtml(c.grade_level)}</td>
-      <td>${escapeHtml(c.shift)}</td>
+      <td>${escapeHtml(c.modality || "Regular")}</td>
+      <td>${escapeHtml(c.mediation_type || "Presencial")}</td>
+      <td>${escapeHtml(formatSchedule(c.start_time, c.end_time))}</td>
       <td>${c.school_year}</td>
       <td>${escapeHtml(c.schools?.name || "—")}</td>
       <td>${teacherCell}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="6">Nenhuma turma cadastrada.</td></tr>';
+  }).join("") || '<tr><td colspan="9">Nenhuma turma cadastrada.</td></tr>';
 }
 
 $("classes-body")?.addEventListener("change", async e => {
@@ -1045,6 +1060,31 @@ if (userForm) {
   });
 }
 
+function resetClassFormDefaults(form, schoolId) {
+  form.reset();
+  document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
+  if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
+  if (form.elements["max_students"]) form.elements["max_students"].value = "30";
+  if (form.elements["modality"]) form.elements["modality"].value = "Regular";
+  if (form.elements["mediation_type"]) form.elements["mediation_type"].value = "Presencial";
+  if (form.elements["schooling"]) form.elements["schooling"].value = "Sim";
+  if (form.elements["complementary_activity"]) form.elements["complementary_activity"].value = "Não";
+  if (form.elements["curriculum_type"]) form.elements["curriculum_type"].value = "Comum";
+  if (form.elements["late_tolerance"]) form.elements["late_tolerance"].value = "Padrão do sistema";
+  if (form.elements["aee_service"]) form.elements["aee_service"].value = "Não";
+  if (form.elements["differentiated_location"]) {
+    form.elements["differentiated_location"].value = "A turma não está em local de funcionamento diferenciado";
+  }
+  if (form.elements["portuguese_second_language"]) {
+    form.elements["portuguese_second_language"].value = "Não oferece disciplina";
+  }
+  if (form.elements["supervised_internship"]) {
+    form.elements["supervised_internship"].value = "Não oferece disciplina";
+  }
+  if (form.elements["bilingual_deaf_class"]) form.elements["bilingual_deaf_class"].value = "Não";
+  if (schoolId && $("class-school")) $("class-school").value = schoolId;
+}
+
 async function insertForm(formId, table, transform = (x) => x, onSuccess = null, beforeInsert = null) {
   const form = $(formId);
   if (!form) return;
@@ -1139,6 +1179,11 @@ $("class-form")?.addEventListener("submit", async e => {
     return;
   }
 
+  if (!raw.grade_level) {
+    notice("Selecione uma etapa de ensino para a turma.", true);
+    return;
+  }
+
   const teacherId = raw.teacher_id || null;
   if (teacherId) {
     const allowedTeachers = new Set(getScopedTeachers(targetSchoolId).map(t => t.id));
@@ -1151,22 +1196,36 @@ $("class-form")?.addEventListener("submit", async e => {
   try {
     const { error } = await supabase.from("classes").insert({
       name: String(raw.name || "").trim(),
+      max_students: Number(raw.max_students) || 30,
+      class_complement: String(raw.class_complement || "").trim() || null,
+      inep_code: String(raw.inep_code || "").trim() || null,
+      modality: raw.modality || "Regular",
       grade_level: String(raw.grade_level || "").trim(),
-      shift: raw.shift,
+      mediation_type: raw.mediation_type || "Presencial",
+      schooling: raw.schooling || "Sim",
+      complementary_activity: raw.complementary_activity || "Não",
+      curriculum_type: raw.curriculum_type || "Comum",
+      start_time: raw.start_time || null,
+      end_time: raw.end_time || null,
+      late_tolerance: raw.late_tolerance || "Padrão do sistema",
+      aee_service: raw.aee_service || "Não",
+      differentiated_location: raw.differentiated_location || "A turma não está em local de funcionamento diferenciado",
+      portuguese_second_language: raw.portuguese_second_language || "Não oferece disciplina",
+      supervised_internship: raw.supervised_internship || "Não oferece disciplina",
+      bilingual_deaf_class: raw.bilingual_deaf_class || "Não",
+      shift: raw.shift || "Matutino",
       school_year: Number(raw.school_year),
       school_id: targetSchoolId,
       teacher_id: teacherId
     });
     if (error) throw error;
 
-    e.target.reset();
-    document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
-    if ($("class-school")) $("class-school").value = targetSchoolId;
+    resetClassFormDefaults(e.target, targetSchoolId);
     notice("Turma criada com sucesso.");
     await loadAll();
   } catch (err) {
     console.error(err);
-    notice("Não foi possível criar a turma. Verifique os campos obrigatórios e suas permissões.", true);
+    notice("Não foi possível criar a turma. Verifique os campos obrigatórios, o banco de dados e suas permissões.", true);
   }
 });
 
