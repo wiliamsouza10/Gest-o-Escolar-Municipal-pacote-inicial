@@ -36,7 +36,7 @@ let cachedMonitors = loadLocalJson(MONITORS_STORAGE_KEY, []);
 let cachedCensus = loadLocalJson(CENSUS_STORAGE_KEY, []);
 
 const $ = (id) => document.getElementById(id);
-const today = new Date().toISOString().slice(0,10);
+const today = new Date().toISOString().slice(0, 10);
 const roleNames = {
   secretaria: "Secretaria de Educação",
   gestor: "Gestor escolar",
@@ -85,7 +85,7 @@ function getActiveSchool() {
   return cachedSchools.find(s => s.id === effectiveId) || null;
 }
 
-function notice(message, bad=false) {
+function notice(message, bad = false) {
   const el = $("notice");
   if (!el) return;
   el.textContent = message;
@@ -94,14 +94,17 @@ function notice(message, bad=false) {
   window.scrollTo({ top: 0, behavior: "smooth" });
   setTimeout(() => el.classList.add("hidden"), 5500);
 }
-function escapeHtml(v="") {
+
+function escapeHtml(v = "") {
   return String(v).replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
 }
+
 function formObject(form) {
   return Object.fromEntries(new FormData(form).entries());
 }
+
 function updateRoleLabel() {
   if (!currentProfile) return;
   const activeSchool = getActiveSchool();
@@ -114,18 +117,14 @@ function updateRoleLabel() {
     $("user-role").textContent = activeSchool ? `${baseRole} · ${activeSchool.name}` : baseRole;
   }
 }
+
 function showApp(profile, user) {
   currentProfile = profile;
 
   if (isSecretaria()) {
     selectedSchoolId = "";
   } else {
-    if (!profile.school_id) {
-      $("login-error").textContent = "Seu perfil ainda não possui uma escola vinculada. Solicite à Secretaria de Educação o vínculo da unidade.";
-      supabase?.auth.signOut();
-      return;
-    }
-    selectedSchoolId = profile.school_id;
+    selectedSchoolId = profile.school_id || "";
   }
 
   $("login-view").classList.add("hidden");
@@ -137,9 +136,15 @@ function showApp(profile, user) {
     const roles = el.dataset.roles.split(",");
     el.classList.toggle("hidden", !roles.includes(profile.role));
   });
+
+  if (!isSecretaria() && !profile.school_id) {
+    notice("Seu perfil ainda não possui uma escola vinculada na tabela de perfis. Solicite à Secretaria de Educação o vínculo da unidade.", true);
+  }
+
   go("inicio");
   loadAll();
 }
+
 function go(page) {
   document.querySelectorAll(".page").forEach(p => p.classList.add("hidden"));
   $("page-" + page)?.classList.remove("hidden");
@@ -165,6 +170,7 @@ function go(page) {
   }
   if (page === "censo") renderCensus();
 }
+
 document.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.page)));
 document.querySelectorAll("[data-goto]").forEach(b => b.addEventListener("click", () => go(b.dataset.goto)));
 
@@ -175,36 +181,67 @@ async function requireConfig() {
   }
   return true;
 }
-$("login-form").addEventListener("submit", async e => {
+
+$("login-form")?.addEventListener("submit", async e => {
   e.preventDefault();
   $("login-error").textContent = "";
   if (!await requireConfig()) return;
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: $("email").value,
-    password: $("password").value
-  });
-  if (error) {
-    $("login-error").textContent = "Não foi possível entrar. Confira o e-mail e a senha ou fale com o administrador.";
-    return;
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: $("email").value.trim(),
+      password: $("password").value
+    });
+    if (error || !data?.user) {
+      $("login-error").textContent = "Não foi possível entrar. Confira o e-mail e a senha ou fale com o administrador.";
+      return;
+    }
+    await loadProfile(data.user);
+  } catch (err) {
+    console.error("Erro no login:", err);
+    $("login-error").textContent = "Erro ao conectar com o servidor de autenticação. Tente novamente.";
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
-  await loadProfile(data.user);
 });
+
 async function loadProfile(user) {
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  if (error || !data) {
-    $("login-error").textContent = "Usuário autenticado, mas sem perfil institucional. Solicite ao administrador a liberação do acesso.";
-    await supabase.auth.signOut();
-    return;
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Erro ao consultar profiles:", error);
+      $("login-error").textContent = `Não foi possível ler seu perfil no banco (${error.message || "verifique as políticas RLS de profiles"}).`;
+      return;
+    }
+
+    if (!data) {
+      $("login-error").textContent = "Usuário autenticado, mas sem perfil institucional na tabela profiles. Solicite ao administrador a liberação do acesso.";
+      return;
+    }
+
+    showApp(data, user);
+  } catch (err) {
+    console.error("Falha inesperada em loadProfile:", err);
+    $("login-error").textContent = "Erro inesperado ao carregar o perfil institucional.";
   }
-  showApp(data, user);
 }
-$("logout").addEventListener("click", async () => {
+
+$("logout")?.addEventListener("click", async () => {
   if (supabase) await supabase.auth.signOut();
   location.reload();
 });
+
 if (supabase) {
   supabase.auth.getSession().then(({ data }) => {
-    if (data.session) loadProfile(data.session.user);
+    if (data?.session?.user) loadProfile(data.session.user);
   });
 }
 
@@ -347,14 +384,14 @@ function applySchoolScope() {
   );
   const activeStudentsCount = activeStudentIds.size;
 
-  $("stat-escolas").textContent = scopedSchools.length;
-  $("stat-alunos").textContent = scopedStudents.length;
-  $("stat-turmas").textContent = scopedClasses.length;
-  $("stat-matriculas").textContent = activeStudentsCount;
+  if ($("stat-escolas")) $("stat-escolas").textContent = scopedSchools.length;
+  if ($("stat-alunos")) $("stat-alunos").textContent = scopedStudents.length;
+  if ($("stat-turmas")) $("stat-turmas").textContent = scopedClasses.length;
+  if ($("stat-matriculas")) $("stat-matriculas").textContent = activeStudentsCount;
 
-  $("report-students").textContent = scopedStudents.length;
-  $("report-classes").textContent = scopedClasses.length;
-  $("report-enrollments").textContent = activeStudentsCount;
+  if ($("report-students")) $("report-students").textContent = scopedStudents.length;
+  if ($("report-classes")) $("report-classes").textContent = scopedClasses.length;
+  if ($("report-enrollments")) $("report-enrollments").textContent = activeStudentsCount;
 
   renderSchools(scopedSchools);
   renderStudents(scopedStudents);
@@ -367,7 +404,7 @@ function applySchoolScope() {
   loadLessons();
 }
 
-async function fetchRows(table, select="*") {
+async function fetchRows(table, select = "*") {
   const orderCol = table === "schools" ? "name" : "created_at";
   const ascending = table === "schools";
   const { data, error } = await supabase
@@ -378,6 +415,7 @@ async function fetchRows(table, select="*") {
   if (error) throw error;
   return data || [];
 }
+
 async function loadProfiles() {
   if (!$("users-body")) return;
   try {
@@ -397,6 +435,7 @@ async function loadProfiles() {
     $("users-body").innerHTML = '<tr><td colspan="4">Não foi possível carregar os usuários. Verifique as permissões da tabela profiles.</td></tr>';
   }
 }
+
 function fillTeacherSelect() {
   const formSchoolId = isSecretaria() ? ($("class-school")?.value || selectedSchoolId) : getEffectiveSchoolId();
   const teachers = getScopedTeachers(formSchoolId);
@@ -427,7 +466,8 @@ async function loadAll() {
     console.error(e);
   }
 }
-function fillSelect(id, items, labelFn, placeholder="Selecione") {
+
+function fillSelect(id, items, labelFn, placeholder = "Selecione") {
   const el = $(id);
   if (!el) return;
   const old = el.value;
@@ -435,6 +475,7 @@ function fillSelect(id, items, labelFn, placeholder="Selecione") {
     items.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(labelFn(x))}</option>`).join("");
   if (items.some(x => x.id === old)) el.value = old;
 }
+
 function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getScopedClasses()) {
   const effectiveId = getEffectiveSchoolId();
   const availableSchools = isSecretaria()
@@ -524,11 +565,14 @@ $("schools-body")?.addEventListener("click", async e => {
 });
 
 function renderStudents(rows = getScopedStudents()) {
+  if (!$("students-body")) return;
   $("students-body").innerHTML = rows.map(s =>
     `<tr><td>${escapeHtml(s.full_name)}</td><td>${escapeHtml(s.birth_date || "—")}</td><td>${escapeHtml(s.guardian_name || "—")}</td><td>${escapeHtml(s.schools?.name || "—")}</td></tr>`
   ).join("") || '<tr><td colspan="4">Nenhum aluno cadastrado.</td></tr>';
 }
+
 function renderClasses(rows = getScopedClasses()) {
+  if (!$("classes-body")) return;
   const canAssignTeacher = canManageClassesAndEnrollments();
   $("classes-body").innerHTML = rows.map(c => {
     const classTeachers = getScopedTeachers(c.school_id);
@@ -593,10 +637,12 @@ $("classes-body")?.addEventListener("change", async e => {
 });
 
 function renderEnrollments(rows = getScopedEnrollments()) {
+  if (!$("enrollments-body")) return;
   $("enrollments-body").innerHTML = rows.map(e =>
     `<tr><td>${escapeHtml(e.students?.full_name || "—")}</td><td>${escapeHtml(e.classes?.name || "—")}</td><td>${e.school_year}</td><td>${escapeHtml(e.status)}</td></tr>`
   ).join("") || '<tr><td colspan="4">Nenhuma matrícula cadastrada.</td></tr>';
 }
+
 function renderUsers() {
   if (!$("users-body")) return;
   const effectiveId = getEffectiveSchoolId();
@@ -953,7 +999,7 @@ if (userForm) {
   });
 }
 
-async function insertForm(formId, table, transform=(x)=>x, onSuccess=null) {
+async function insertForm(formId, table, transform = (x) => x, onSuccess = null) {
   const form = $(formId);
   if (!form) return;
   form.addEventListener("submit", async e => {
@@ -1094,6 +1140,7 @@ insertForm("lesson-form", "lessons", x => ({
 }));
 
 async function loadLessons() {
+  if (!$("lessons-body")) return;
   try {
     const { data, error } = await supabase
       .from("lessons")
@@ -1104,14 +1151,16 @@ async function loadLessons() {
     const effectiveId = getEffectiveSchoolId();
     const rows = (data || []).filter(l => !effectiveId || l.classes?.school_id === effectiveId);
     $("lessons-body").innerHTML = rows.map(l =>
-      `<tr><td>${l.lesson_date}</td><td>${escapeHtml(l.classes?.name || "—")}</td><td>${escapeHtml(l.subject)}</td><td>${escapeHtml(l.content)}</td></tr>`
+      `<tr><td>${escapeHtml(l.lesson_date)}</td><td>${escapeHtml(l.classes?.name || "—")}</td><td>${escapeHtml(l.subject)}</td><td>${escapeHtml(l.content)}</td></tr>`
     ).join("") || '<tr><td colspan="4">Nenhuma aula registrada.</td></tr>';
   } catch (e) {
     console.error(e);
   }
 }
-$("load-attendance").addEventListener("click", async () => {
-  const classId = $("attendance-class").value, date = $("attendance-date").value;
+
+$("load-attendance")?.addEventListener("click", async () => {
+  const classId = $("attendance-class")?.value;
+  const date = $("attendance-date")?.value;
   if (!classId || !date) {
     notice("Selecione uma turma e uma data.", true);
     return;
@@ -1126,23 +1175,52 @@ $("load-attendance").addEventListener("click", async () => {
     if (error) throw error;
     attendanceRows = (data || []).map(x => ({
       student_id: x.student_id,
-      name: x.students.full_name,
+      name: x.students?.full_name || "Aluno",
       status: "presente"
     }));
     $("attendance-list").innerHTML = attendanceRows.map((x, i) =>
       `<div class="attendance-row"><strong>${escapeHtml(x.name)}</strong><select data-attendance="${i}"><option value="presente">Presente</option><option value="falta">Falta</option><option value="justificada">Falta justificada</option></select></div>`
     ).join("") || "<p class='muted'>Não há alunos ativos nesta turma/ano.</p>";
     $("attendance-list").querySelectorAll("select").forEach(s =>
-      s.addEventListener("change", () => attendanceRows[Number(s.dataset.attendance)].status = s.value)
+      s.addEventListener("change", () => {
+        attendanceRows[Number(s.dataset.attendance)].status = s.value;
+      })
     );
-    $("save-attendance").classList.toggle("hidden", attendanceRows.length === 0);
+    $("save-attendance")?.classList.toggle("hidden", attendanceRows.length === 0);
   } catch (e) {
     console.error(e);
     notice("Não foi possível carregar a lista de alunos.", true);
   }
 });
-$("save-attendance").addEventListener("click", async () => {
-  const classId = $("attendance-class").value, date = $("attendance-date").value;
+
+$("save-attendance")?.addEventListener("click", async () => {
+  const classId = $("attendance-class")?.value;
+  const date = $("attendance-date")?.value;
+  if (!classId || !date || !attendanceRows.length) return;
+
   try {
     const payload = attendanceRows.map(x => ({
-      class_id
+      class_id: classId,
+      student_id: x.student_id,
+      attendance_date: date,
+      status: x.status,
+      recorded_by: currentProfile?.id || null
+    }));
+    const { error } = await supabase
+      .from("attendance")
+      .upsert(payload, { onConflict: "class_id,student_id,attendance_date" });
+    if (error) throw error;
+    notice("Frequência salva com sucesso.");
+  } catch (e) {
+    console.error(e);
+    notice("Não foi possível salvar a frequência. Verifique as permissões.", true);
+  }
+});
+
+if ($("attendance-date")) $("attendance-date").value = today;
+document.querySelectorAll('input[name="school_year"]').forEach(x => {
+  x.value = new Date().getFullYear();
+});
+if ($('input[name="census_year"]')) {
+  $('input[name="census_year"]').value = new Date().getFullYear();
+}
