@@ -45,6 +45,25 @@ const roleNames = {
   monitor_complementar: "Monitor de atividade complementar"
 };
 
+function normalizeCpf(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function validateAndNormalizeCpf(value, label = "CPF") {
+  const digits = normalizeCpf(value);
+  if (!digits) return { valid: true, cpf: null };
+  if (digits.length !== 11) {
+    return { valid: false, error: `${label} inválido: informe os 11 dígitos numéricos.` };
+  }
+  return { valid: true, cpf: digits };
+}
+
+function formatCpf(value) {
+  const digits = normalizeCpf(value);
+  if (digits.length !== 11) return value || "—";
+  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+}
+
 function loadLocalJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -240,8 +259,16 @@ $("logout")?.addEventListener("click", async () => {
 });
 
 if (supabase) {
-  supabase.auth.getSession().then(({ data }) => {
-    if (data?.session?.user) loadProfile(data.session.user);
+  supabase.auth.getSession().then(async ({ data, error }) => {
+    if (error) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      return;
+    }
+    if (data?.session?.user) {
+      await loadProfile(data.session.user);
+    }
+  }).catch(async () => {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
   });
 }
 
@@ -432,7 +459,7 @@ async function loadProfiles() {
   } catch (e) {
     console.warn("Não foi possível carregar perfis:", e);
     fillSelect("class-teacher", [], x => x.full_name, "Não definido");
-    $("users-body").innerHTML = '<tr><td colspan="4">Não foi possível carregar os usuários. Verifique as permissões da tabela profiles.</td></tr>';
+    $("users-body").innerHTML = '<tr><td colspan="5">Não foi possível carregar os usuários. Verifique as permissões da tabela profiles.</td></tr>';
   }
 }
 
@@ -567,8 +594,14 @@ $("schools-body")?.addEventListener("click", async e => {
 function renderStudents(rows = getScopedStudents()) {
   if (!$("students-body")) return;
   $("students-body").innerHTML = rows.map(s =>
-    `<tr><td>${escapeHtml(s.full_name)}</td><td>${escapeHtml(s.birth_date || "—")}</td><td>${escapeHtml(s.guardian_name || "—")}</td><td>${escapeHtml(s.schools?.name || "—")}</td></tr>`
-  ).join("") || '<tr><td colspan="4">Nenhum aluno cadastrado.</td></tr>';
+    `<tr>
+      <td>${escapeHtml(s.full_name)}</td>
+      <td>${escapeHtml(formatCpf(s.cpf))}</td>
+      <td>${escapeHtml(s.birth_date || "—")}</td>
+      <td>${escapeHtml(s.guardian_name || "—")}</td>
+      <td>${escapeHtml(s.schools?.name || "—")}</td>
+    </tr>`
+  ).join("") || '<tr><td colspan="5">Nenhum aluno cadastrado.</td></tr>';
 }
 
 function renderClasses(rows = getScopedClasses()) {
@@ -660,11 +693,12 @@ function renderUsers() {
       : `<button type="button" class="secondary small" data-delete-user="${escapeHtml(u.id)}" data-user-name="${escapeHtml(u.full_name || "este usuário")}">Excluir</button>`;
     return `<tr>
       <td>${escapeHtml(u.full_name || "—")}</td>
+      <td>${escapeHtml(formatCpf(u.cpf))}</td>
       <td>${escapeHtml(roleNames[u.role] || u.role || "—")}</td>
       <td>${escapeHtml(escolaLabel)}</td>
       <td>${actionBtn}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="4">Nenhum usuário cadastrado.</td></tr>';
+  }).join("") || '<tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>';
 }
 
 // --- MATRIZ CURRICULAR (OBRIGATÓRIA E COMPLEMENTAR NÃO OBRIGATÓRIA) ---
@@ -977,8 +1011,20 @@ if (userForm) {
     }
 
     const payload = formObject(userForm);
+    const cpfCheck = validateAndNormalizeCpf(payload.cpf, "CPF");
+    if (!cpfCheck.valid) {
+      notice(cpfCheck.error, true);
+      return;
+    }
+
+    if (cpfCheck.cpf && cachedProfiles.some(p => normalizeCpf(p.cpf) === cpfCheck.cpf)) {
+      notice("Já existe um usuário ou professor cadastrado com este CPF.", true);
+      return;
+    }
+
     const body = {
       full_name: payload.full_name?.trim(),
+      cpf: cpfCheck.cpf,
       email: payload.email?.trim().toLowerCase(),
       password: payload.password,
       role: payload.role,
@@ -999,12 +1045,20 @@ if (userForm) {
   });
 }
 
-async function insertForm(formId, table, transform = (x) => x, onSuccess = null) {
+async function insertForm(formId, table, transform = (x) => x, onSuccess = null, beforeInsert = null) {
   const form = $(formId);
   if (!form) return;
   form.addEventListener("submit", async e => {
     e.preventDefault();
-    const obj = transform(formObject(form));
+    const raw = formObject(form);
+    if (beforeInsert) {
+      const check = beforeInsert(raw);
+      if (check && check.ok === false) {
+        notice(check.message || "Verifique os dados informados.", true);
+        return;
+      }
+    }
+    const obj = transform(raw);
     try {
       const { data, error } = await supabase.from(table).insert(obj).select().single();
       if (error) throw error;
@@ -1023,6 +1077,14 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null)
       if (onSuccess && data) onSuccess(data);
     } catch (err) {
       console.error(err);
+      if (err?.code === "23505" && table === "students") {
+        notice("Já existe um aluno cadastrado com este CPF.", true);
+        return;
+      }
+      if (err?.code === "22023") {
+        notice(err.message || "CPF inválido: informe 11 dígitos numéricos.", true);
+        return;
+      }
       notice("Não foi possível salvar. Verifique os campos obrigatórios e suas permissões.", true);
     }
   });
@@ -1040,14 +1102,28 @@ insertForm("school-form", "schools", x => ({
   }
 });
 
-insertForm("student-form", "students", x => ({
-  ...x,
-  school_id: isSecretaria() ? x.school_id : getEffectiveSchoolId(),
-  birth_date: x.birth_date || null,
-  guardian_name: x.guardian_name || null,
-  guardian_phone: x.guardian_phone || null,
-  notes: x.notes || null
-}));
+insertForm(
+  "student-form",
+  "students",
+  x => ({
+    ...x,
+    cpf: validateAndNormalizeCpf(x.cpf, "CPF do aluno").cpf,
+    school_id: isSecretaria() ? x.school_id : getEffectiveSchoolId(),
+    birth_date: x.birth_date || null,
+    guardian_name: x.guardian_name || null,
+    guardian_phone: x.guardian_phone || null,
+    notes: x.notes || null
+  }),
+  null,
+  raw => {
+    const check = validateAndNormalizeCpf(raw.cpf, "CPF do aluno");
+    if (!check.valid) return { ok: false, message: check.error };
+    if (check.cpf && cachedStudents.some(s => normalizeCpf(s.cpf) === check.cpf)) {
+      return { ok: false, message: "Já existe um aluno cadastrado com este CPF." };
+    }
+    return { ok: true };
+  }
+);
 
 $("class-form")?.addEventListener("submit", async e => {
   e.preventDefault();
