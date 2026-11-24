@@ -146,7 +146,7 @@
               <input name="class_complement" maxlength="30" placeholder="Ex: A, B...">
             </label>
             <label>Cód. INEP
-              <input name="inep_code" maxlength="30" placeholder="Código INEP da turma">
+              <input name="inep_code" maxlength="30" placeholder="Bloqueado" readonly disabled aria-disabled="true">
             </label>
 
             <label>Modalidade
@@ -285,6 +285,7 @@
             <table>
               <thead>
                 <tr>
+                  <th>Cód. Turma</th>
                   <th>Turma</th>
                   <th>Comp.</th>
                   <th>Etapa</th>
@@ -296,7 +297,7 @@
                   <th>Professor</th>
                 </tr>
               </thead>
-              <tbody id="classes-body"><tr><td colspan="9">Carregando...</td></tr></tbody>
+              <tbody id="classes-body"><tr><td colspan="10">Carregando...</td></tr></tbody>
             </table>
           </div>
         </div>
