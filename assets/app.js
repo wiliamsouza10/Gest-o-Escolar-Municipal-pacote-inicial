@@ -45,6 +45,21 @@ const roleNames = {
   monitor_complementar: "Monitor de atividade complementar"
 };
 
+function generateFourDigitClassCode() {
+  const existingCodes = new Set(
+    cachedClasses
+      .map(c => String(c.class_code || "").trim())
+      .filter(Boolean)
+  );
+
+  for (let i = 0; i < 100; i++) {
+    const code = String(Math.floor(1000 + Math.random() * 9000));
+    if (!existingCodes.has(code)) return code;
+  }
+
+  return String(1000 + (Date.now() % 9000)).padStart(4, "0");
+}
+
 function normalizeCpf(value) {
   return String(value || "").replace(/\D/g, "");
 }
@@ -504,8 +519,9 @@ function fillSelect(id, items, labelFn, placeholder = "Selecione") {
 }
 
 function formatClassLabel(c) {
+  const codePrefix = c.class_code ? `[${c.class_code}] ` : "";
   const comp = c.class_complement ? ` (${c.class_complement})` : "";
-  return `${c.name}${comp} — ${c.grade_level}`;
+  return `${codePrefix}${c.name}${comp} — ${c.grade_level}`;
 }
 
 function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getScopedClasses()) {
@@ -630,6 +646,7 @@ function renderClasses(rows = getScopedClasses()) {
       : escapeHtml(currentTeacher?.full_name || "Não definido");
 
     return `<tr>
+      <td>${escapeHtml(c.class_code || "—")}</td>
       <td>${escapeHtml(c.name)}</td>
       <td>${escapeHtml(c.class_complement || "—")}</td>
       <td>${escapeHtml(c.grade_level)}</td>
@@ -640,7 +657,7 @@ function renderClasses(rows = getScopedClasses()) {
       <td>${escapeHtml(c.schools?.name || "—")}</td>
       <td>${teacherCell}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="9">Nenhuma turma cadastrada.</td></tr>';
+  }).join("") || '<tr><td colspan="10">Nenhuma turma cadastrada.</td></tr>';
 }
 
 $("classes-body")?.addEventListener("change", async e => {
@@ -1065,6 +1082,11 @@ function resetClassFormDefaults(form, schoolId) {
   document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
   if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
   if (form.elements["max_students"]) form.elements["max_students"].value = "30";
+  if (form.elements["inep_code"]) {
+    form.elements["inep_code"].value = "";
+    form.elements["inep_code"].readOnly = true;
+    form.elements["inep_code"].disabled = true;
+  }
   if (form.elements["modality"]) form.elements["modality"].value = "Regular";
   if (form.elements["mediation_type"]) form.elements["mediation_type"].value = "Presencial";
   if (form.elements["schooling"]) form.elements["schooling"].value = "Sim";
@@ -1193,12 +1215,15 @@ $("class-form")?.addEventListener("submit", async e => {
     }
   }
 
+  const classCode = generateFourDigitClassCode();
+
   try {
     const { error } = await supabase.from("classes").insert({
+      class_code: classCode,
       name: String(raw.name || "").trim(),
       max_students: Number(raw.max_students) || 30,
       class_complement: String(raw.class_complement || "").trim() || null,
-      inep_code: String(raw.inep_code || "").trim() || null,
+      inep_code: null,
       modality: raw.modality || "Regular",
       grade_level: String(raw.grade_level || "").trim(),
       mediation_type: raw.mediation_type || "Presencial",
@@ -1221,7 +1246,7 @@ $("class-form")?.addEventListener("submit", async e => {
     if (error) throw error;
 
     resetClassFormDefaults(e.target, targetSchoolId);
-    notice("Turma criada com sucesso.");
+    notice(`Turma criada com sucesso! Código da turma: ${classCode}.`);
     await loadAll();
   } catch (err) {
     console.error(err);
