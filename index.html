@@ -655,6 +655,99 @@
                 <strong id="sec-report-mudancas-matricula">—</strong>
               </div>
             </div>
+
+            <div class="panel-sub" style="margin-top:24px;border:1px solid #dfe6ed;border-radius:12px;padding:16px;background:#ffffff;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid #edf1f5;">
+                <div>
+                  <h4 style="margin:0;">Análise de dados — Registros de aulas</h4>
+                  <p class="muted small" style="margin:2px 0 0;">Monitoramento de lançamentos de aulas, último registro e dias sem lançamento por unidade escolar.</p>
+                </div>
+                <button type="button" class="secondary small" id="sec-lessons-print">Imprimir</button>
+              </div>
+
+              <div class="inline-controls" style="margin-top:14px;flex-wrap:wrap;align-items:flex-end;">
+                <label class="small">
+                  Ano Letivo
+                  <select id="sec-lessons-year"></select>
+                </label>
+                <label class="small">
+                  Escola
+                  <select id="sec-lessons-school">
+                    <option value="">— Todas as escolas —</option>
+                  </select>
+                </label>
+                <button type="button" class="primary small" id="sec-lessons-refresh">Atualizar</button>
+              </div>
+
+              <div class="report-grid" style="margin-top:16px;">
+                <div class="report" style="background:#f5f9ff;border-left:4px solid #2b6cb0;">
+                  <span>Escolas / Turmas</span>
+                  <strong id="sec-lessons-kpi-classes" style="color:#1e56a0;">—</strong>
+                  <small class="muted small" id="sec-lessons-kpi-schools">— escola(s)</small>
+                </div>
+                <div class="report" style="background:#f3fbf6;border-left:4px solid #2f855a;">
+                  <span>Com registro</span>
+                  <strong id="sec-lessons-kpi-with" style="color:#1f7a4c;">—</strong>
+                </div>
+                <div class="report" style="background:#fff6f6;border-left:4px solid #c53030;">
+                  <span>Sem registro</span>
+                  <strong id="sec-lessons-kpi-without" style="color:#c53030;">—</strong>
+                </div>
+                <div class="report" style="background:#fffbf0;border-left:4px solid #d69e2e;">
+                  <span>Média dias s/ lançamento</span>
+                  <strong id="sec-lessons-kpi-avg-days" style="color:#b7791f;">—</strong>
+                </div>
+              </div>
+
+              <div class="table-wrap" style="margin-top:16px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Escola</th>
+                      <th>Famílias</th>
+                      <th>Turmas</th>
+                      <th>Registros</th>
+                      <th>Último Reg.</th>
+                      <th>Dias s/ Lanç.</th>
+                      <th>Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sec-lessons-body">
+                    <tr><td colspan="7">Carregando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px;flex-wrap:wrap;">
+                <span class="muted small" id="sec-lessons-summary">—</span>
+              </div>
+
+              <div id="sec-lessons-school-detail" class="hidden" style="margin-top:18px;padding:14px;border-radius:10px;border:1px solid #d7e2ec;background:#f9fbfd;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                  <div>
+                    <strong id="sec-lessons-detail-title">Turmas da unidade</strong>
+                    <p class="muted small" id="sec-lessons-detail-subtitle" style="margin:2px 0 0;"></p>
+                  </div>
+                  <button type="button" class="secondary small" id="sec-lessons-close-detail">Fechar turmas</button>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Turma</th>
+                        <th>Etapa / Turno</th>
+                        <th>Registros</th>
+                        <th>Último Reg.</th>
+                        <th>Dias s/ Lanç.</th>
+                      </tr>
+                    </thead>
+                    <tbody id="sec-lessons-detail-body">
+                      <tr><td colspan="5">Selecione uma escola.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div id="standard-report-view">
