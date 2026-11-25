@@ -83,13 +83,15 @@
 
         <div class="stats">
           <article class="stat"><span>Alunos cadastrados</span><strong id="stat-alunos">—</strong><small>Conforme seu nível de acesso</small></article>
-          <article class="stat"><span>Matrículas ativas</span><strong id="stat-matriculas">—</strong><small>Ano letivo vigente</small></article>
+          <article class="stat"><span>Matrículas ativas</span><strong id="stat-matriculas">—</strong><small>Alunos ativos (Regular e AEE)</small></article>
+          <article class="stat"><span>Enturmados no AEE</span><strong id="stat-aee">—</strong><small>Ativos em turma de AEE</small></article>
+          <article class="stat"><span>Declarados PcD</span><strong id="stat-pcd">—</strong><small>Na unidade / escopo atual</small></article>
           <article class="stat"><span>Turmas cadastradas</span><strong id="stat-turmas">—</strong><small>Turmas disponíveis</small></article>
           <article class="stat"><span>Escolas</span><strong id="stat-escolas">—</strong><small>Unidades na rede</small></article>
         </div>
         <div class="panel"><div class="panel-head"><div><h3>Acesso rápido</h3><p class="muted">Escolha uma atividade para começar.</p></div></div><div class="quick-grid">
           <button data-goto="alunos" class="quick"><b>＋</b><strong>Cadastrar aluno</strong><span>Adicionar estudante à base</span></button>
-          <button data-goto="matriculas" class="quick"><b>▤</b><strong>Gerenciar matrículas</strong><span>Registrar vínculo escolar</span></button>
+          <button data-goto="matriculas" class="quick"><b>▤</b><strong>Gerenciar matrículas</strong><span>Regular e turma de AEE</span></button>
           <button data-goto="diario" class="quick"><b>▧</b><strong>Abrir diário</strong><span>Frequência e conteúdo</span></button>
           <button data-goto="relatorios" class="quick"><b>▥</b><strong>Ver relatórios</strong><span>Acompanhar indicadores</span></button>
         </div></div>
@@ -124,31 +126,48 @@
       </section>
 
       <section id="page-alunos" class="page hidden">
-        <div class="panel"><div class="panel-head"><div><h3>Cadastro de alunos</h3><p class="muted">Cadastre somente os dados necessários à finalidade educacional.</p></div></div>
+        <div class="panel"><div class="panel-head"><div><h3>Cadastro de alunos</h3><p class="muted">Cadastre somente os dados necessários à finalidade educacional, incluindo declaração PcD.</p></div></div>
           <form id="student-form" class="form-grid">
             <label>Nome completo<input name="full_name" required maxlength="160"></label>
             <label>CPF do aluno<input name="cpf" maxlength="14" inputmode="numeric" placeholder="000.000.000-00"></label>
             <label>Data de nascimento<input name="birth_date" type="date" required></label>
+            <label>Declarado PcD
+              <select name="is_pcd" required>
+                <option value="false" selected>Não</option>
+                <option value="true">Sim</option>
+              </select>
+            </label>
             <label>Nome do responsável<input name="guardian_name" maxlength="160"></label>
             <label>Contato do responsável<input name="guardian_phone" maxlength="30"></label>
             <label>Escola<select name="school_id" id="student-school" required><option value="">Selecione</option></select></label>
             <label>Observação administrativa<input name="notes" maxlength="250"></label>
             <button class="primary" type="submit">Salvar aluno</button>
           </form>
-          <div class="table-wrap"><table><thead><tr><th>Aluno</th><th>CPF</th><th>Nascimento</th><th>Responsável</th><th>Escola</th></tr></thead><tbody id="students-body"><tr><td colspan="5">Carregando...</td></tr></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Aluno</th><th>CPF</th><th>Nascimento</th><th>PcD</th><th>Responsável</th><th>Escola</th></tr></thead><tbody id="students-body"><tr><td colspan="6">Carregando...</td></tr></tbody></table></div>
         </div>
       </section>
 
       <section id="page-matriculas" class="page hidden">
-        <div class="panel"><div class="panel-head"><div><h3>Matrículas</h3><p class="muted">Vincule o aluno a uma turma e ao ano letivo.</p></div></div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Matrículas (Regular e AEE)</h3>
+              <p class="muted">Permite vincular o aluno a 1 turma regular e 1 turma de AEE no ano letivo.</p>
+            </div>
+          </div>
+          <div class="report-grid" style="margin-bottom: 14px;">
+            <div class="report"><span>Enturmados na turma de AEE</span><strong id="enrollments-aee-count">—</strong></div>
+            <div class="report"><span>Alunos declarados PcD na unidade</span><strong id="enrollments-pcd-count">—</strong></div>
+            <div class="report"><span>Matrículas ativas no escopo</span><strong id="enrollments-active-count">—</strong></div>
+          </div>
           <form id="enrollment-form" class="form-grid">
             <label>Aluno<select name="student_id" id="enrollment-student" required><option value="">Selecione</option></select></label>
-            <label>Turma<select name="class_id" id="enrollment-class" required><option value="">Selecione</option></select></label>
+            <label>Turma (Regular ou AEE)<select name="class_id" id="enrollment-class" required><option value="">Selecione</option></select></label>
             <label>Ano letivo<input name="school_year" type="number" min="2020" max="2100" required></label>
             <label>Situação<select name="status"><option value="ativa">Ativa</option><option value="aguardando">Aguardando</option><option value="transferida">Transferida</option><option value="cancelada">Cancelada</option></select></label>
             <button class="primary" type="submit">Registrar matrícula</button>
           </form>
-          <div class="table-wrap"><table><thead><tr><th>Aluno</th><th>Turma</th><th>Ano</th><th>Situação</th></tr></thead><tbody id="enrollments-body"><tr><td colspan="4">Carregando...</td></tr></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Aluno</th><th>PcD</th><th>Turma</th><th>Tipo de Turma</th><th>Ano</th><th>Situação</th></tr></thead><tbody id="enrollments-body"><tr><td colspan="6">Carregando...</td></tr></tbody></table></div>
         </div>
       </section>
 
@@ -157,12 +176,12 @@
           <div class="panel-head">
             <div>
               <h3>Cadastrar turma</h3>
-              <p class="muted">Organização por etapa, modalidade, mediação, horário, currículo e vínculos.</p>
+              <p class="muted">Organização por etapa, modalidade, mediação, horário, currículo e vínculos. A quantidade de alunos ativos aparece na tabela abaixo.</p>
             </div>
           </div>
           <form id="class-form" class="form-grid">
             <label>Nome turma
-              <input name="name" required maxlength="160" placeholder="Ex.: 5º ano A">
+              <input name="name" required maxlength="160" placeholder="Ex.: 5º ano A ou Sala AEE">
             </label>
             <label>Quant. Alunos
               <input name="max_students" type="number" min="1" max="200" value="30" required>
@@ -315,14 +334,15 @@
                   <th>Comp.</th>
                   <th>Etapa</th>
                   <th>Modalidade</th>
-                  <th>Mediação</th>
+                  <th>AEE</th>
+                  <th>Alunos ativos</th>
                   <th>Horário</th>
                   <th>Ano</th>
                   <th>Escola</th>
                   <th>Professor</th>
                 </tr>
               </thead>
-              <tbody id="classes-body"><tr><td colspan="10">Carregando...</td></tr></tbody>
+              <tbody id="classes-body"><tr><td colspan="11">Carregando...</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -519,7 +539,13 @@
 
       <section id="page-relatorios" class="page hidden">
         <div class="panel"><div class="panel-head"><div><h3>Relatórios e indicadores</h3><p class="muted">Resumo dos registros aos quais seu perfil tem acesso.</p></div></div>
-          <div class="report-grid"><div class="report"><span>Alunos cadastrados</span><strong id="report-students">—</strong></div><div class="report"><span>Matrículas ativas</span><strong id="report-enrollments">—</strong></div><div class="report"><span>Turmas</span><strong id="report-classes">—</strong></div></div>
+          <div class="report-grid">
+            <div class="report"><span>Alunos cadastrados</span><strong id="report-students">—</strong></div>
+            <div class="report"><span>Matrículas ativas</span><strong id="report-enrollments">—</strong></div>
+            <div class="report"><span>Enturmados no AEE</span><strong id="report-aee">—</strong></div>
+            <div class="report"><span>Declarados PcD</span><strong id="report-pcd">—</strong></div>
+            <div class="report"><span>Turmas</span><strong id="report-classes">—</strong></div>
+          </div>
           <p class="muted small">Os indicadores são calculados a partir dos registros disponíveis para seu perfil. Para relatórios oficiais, valide os dados com a escrituração escolar.</p>
         </div>
       </section>
