@@ -561,22 +561,27 @@
           </form>
 
           <div id="census-school-blocks-section" class="panel-sub hidden" style="margin-top: 20px;">
-            <h4>Blocos temáticos do Censo Escolar</h4>
-            <p class="muted" id="census-blocks-hint">Clique em um bloco para editar ou atualizar as informações da unidade escolar.</p>
-            <div id="census-modules-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:14px;"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div>
+                <h4>Blocos temáticos do Censo Escolar</h4>
+                <p class="muted" id="census-blocks-hint" style="margin:2px 0 0;">Clique em um bloco para editar ou atualizar as informações da unidade escolar.</p>
+              </div>
+              <button type="button" class="secondary small" id="census-sync-school-data">Migrar dados da escola</button>
+            </div>
+            <div id="census-modules-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:14px;"></div>
 
-            <div id="census-module-editor" class="hidden" style="margin-top:18px;padding:16px;border-radius:12px;border:1px solid #d5e2d0;background:#f8fbf7;">
+            <div id="census-module-editor" class="hidden" style="margin-top:18px;padding:16px;border-radius:12px;border:1px solid #c9dfbe;background:#ffffff;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
                 <div>
                   <strong id="census-editor-title" style="font-size:1.05rem;">Bloco do Censo</strong>
                   <p class="muted small" id="census-editor-subtitle" style="margin:2px 0 0;"></p>
                 </div>
-                <button type="button" class="secondary small" id="census-close-editor">Fechar bloco</button>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <button type="button" class="primary small" id="census-save-module">Salvar bloco no Censo</button>
+                  <button type="button" class="secondary small" id="census-close-editor">Fechar bloco</button>
+                </div>
               </div>
               <div id="census-module-fields" class="form-grid"></div>
-              <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
-                <button type="button" class="primary" id="census-save-module">Salvar bloco no Censo</button>
-              </div>
             </div>
           </div>
 
