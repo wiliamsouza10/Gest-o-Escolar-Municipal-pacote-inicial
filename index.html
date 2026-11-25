@@ -500,15 +500,17 @@
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Mapeamento do Censo Escolar</h3>
-              <p class="muted">Consolidado e conferência de dados cadastrais, ofertas, estrutura e vínculos para declaração do Censo.</p>
+              <h3>CENSO ESCOLAR</h3>
+              <p class="muted">Selecione uma unidade escolar e clique em qualquer bloco temático para preencher ou conferir os dados do Censo Escolar.</p>
             </div>
           </div>
+
           <div class="report-grid">
             <div class="report"><span>Escolas mapeadas</span><strong id="censo-schools-count">—</strong></div>
             <div class="report"><span>Alunos com nascimento/escola</span><strong id="censo-students-count">—</strong></div>
             <div class="report"><span>Turmas / Matrículas ativas</span><strong id="censo-enrollments-count">—</strong></div>
           </div>
+
           <form id="census-form" class="form-grid" style="margin-top: 16px;">
             <label>Unidade escolar
               <select name="school_id" id="census-school" required>
@@ -516,23 +518,23 @@
               </select>
             </label>
             <label>Ano de referência
-              <input name="census_year" type="number" min="2020" max="2100" required>
+              <input name="census_year" id="census-year-input" type="number" min="2020" max="2100" required>
             </label>
             <label>Situação de funcionamento
-              <select name="operating_status" required>
+              <select name="operating_status" id="census-operating-status" required>
                 <option value="Em atividade">Em atividade</option>
                 <option value="Paralisada">Paralisada</option>
                 <option value="Extinta">Extinta</option>
               </select>
             </label>
             <label>Etapas ofertadas
-              <input name="offered_stages" required maxlength="200" placeholder="Ex.: Ed. Infantil, Fund. I">
+              <input name="offered_stages" id="census-offered-stages" required maxlength="200" placeholder="Ex.: Ed. Infantil, Fund. I">
             </label>
             <label>Internet / Laboratório / Acessibilidade
-              <input name="infrastructure_notes" maxlength="250" placeholder="Ex.: Banda larga, sala de informática">
+              <input name="infrastructure_notes" id="census-infrastructure-notes" maxlength="250" placeholder="Ex.: Banda larga, sala de informática">
             </label>
             <label>Status de conferência
-              <select name="validation_status" required>
+              <select name="validation_status" id="census-validation-status" required>
                 <option value="Pendente">Pendente</option>
                 <option value="Em conferência">Em conferência</option>
                 <option value="Validado para Censo">Validado para Censo</option>
@@ -540,13 +542,34 @@
             </label>
             <button class="primary" type="submit">Salvar mapeamento do Censo</button>
           </form>
-          <div class="table-wrap">
+
+          <div class="panel-sub" style="margin-top: 20px;">
+            <h4>Blocos temáticos do Censo Escolar</h4>
+            <p class="muted">Clique em um bloco para editar os campos específicos da unidade e ano selecionados[cite: 4].</p>
+            <div id="census-modules-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:14px;"></div>
+
+            <div id="census-module-editor" class="hidden" style="margin-top:18px;padding:16px;border-radius:12px;border:1px solid #d5e2d0;background:#f8fbf7;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                <div>
+                  <strong id="census-editor-title" style="font-size:1.05rem;">Bloco do Censo</strong>
+                  <p class="muted small" id="census-editor-subtitle" style="margin:2px 0 0;"></p>
+                </div>
+                <button type="button" class="secondary small" id="census-close-editor">Fechar bloco</button>
+              </div>
+              <div id="census-module-fields" class="form-grid"></div>
+              <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+                <button type="button" class="primary" id="census-save-module">Salvar bloco no Censo</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrap" style="margin-top: 20px;">
             <table>
               <thead>
-                <tr><th>Escola</th><th>INEP</th><th>Ano</th><th>Situação</th><th>Etapas</th><th>Status Censo</th><th>Ações</th></tr>
+                <tr><th>Escola</th><th>INEP</th><th>Ano</th><th>Situação</th><th>Etapas</th><th>Blocos preenchidos</th><th>Status Censo</th><th>Ações</th></tr>
               </thead>
               <tbody id="census-body">
-                <tr><td colspan="7">Carregando...</td></tr>
+                <tr><td colspan="8">Carregando...</td></tr>
               </tbody>
             </table>
           </div>
