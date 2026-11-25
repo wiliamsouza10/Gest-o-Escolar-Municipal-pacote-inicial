@@ -2,7 +2,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 /*
   CONFIGURAÇÃO: substitua pelos dados do projeto Supabase.
-  Não coloque a chave secreta / service_role neste arquivo. Use somente a chave pública (Publishable key).
+  Não coloque a chave secreta / service_role neste arquivo. Use somente a chave pública (Publishable / anon key).
 */
 const SUPABASE_URL = "https://xkuypxublyyrevrmaale.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_AK9mLZ12c6fUaltPDtTD2Q_oNfG6sXD";
@@ -22,6 +22,24 @@ const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v2";
 const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
 const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v2";
 const SCHOOL_DRAFT_CENSUS_KEY = "ge_rascunho_censo_escola_v1";
+
+function formatSupabaseError(err) {
+  if (!err) return "Erro desconhecido";
+  if (typeof err === "string") return err;
+  const parts = [];
+  if (err.status || err.statusCode) parts.push(`HTTP ${err.status || err.statusCode}`);
+  if (err.code) parts.push(`código ${err.code}`);
+  if (err.message) parts.push(err.message);
+  if (err.details) parts.push(err.details);
+  if (err.hint) parts.push(`dica: ${err.hint}`);
+  return parts.length ? parts.join(" · ") : JSON.stringify(err);
+}
+
+function isAuth401Error(err) {
+  const status = Number(err?.status || err?.statusCode || 0);
+  const msg = String(err?.message || "").toLowerCase();
+  return status === 401 || msg.includes("invalid api key") || msg.includes("jwt") || msg.includes("401");
+}
 
 // 21 blocos exibidos no cadastro da unidade escolar e na seção CENSO ESCOLAR (gestor e secretário escolar)
 const CENSUS_MODULES = [
@@ -330,7 +348,7 @@ function saveLocalJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
-    console.warn("Não foi possível salvar localmente:", e);
+    console.warn("Não foi possível salvar localmente:", formatSupabaseError(e));
   }
 }
 
@@ -402,7 +420,7 @@ function notice(message, bad = false) {
   el.classList.remove("hidden", "bad");
   if (bad) el.classList.add("bad");
   window.scrollTo({ top: 0, behavior: "smooth" });
-  setTimeout(() => el.classList.add("hidden"), 5500);
+  setTimeout(() => el.classList.add("hidden"), 6500);
 }
 
 function escapeHtml(v = "") {
@@ -512,12 +530,14 @@ $("login-form")?.addEventListener("submit", async e => {
       password: $("password").value
     });
     if (error || !data?.user) {
-      $("login-error").textContent = "Não foi possível entrar. Confira o e-mail e a senha ou fale com o administrador.";
+      $("login-error").textContent = isAuth401Error(error)
+        ? "Falha de autenticação (401): verifique a chave pública do Supabase em assets/app.js ou o e-mail/senha."
+        : "Não foi possível entrar. Confira o e-mail e a senha ou fale com o administrador.";
       return;
     }
     await loadProfile(data.user);
   } catch (err) {
-    console.error("Erro no login:", err);
+    console.error("Erro no login:", formatSupabaseError(err), err);
     $("login-error").textContent = "Erro ao conectar com o servidor de autenticação. Tente novamente.";
   } finally {
     if (submitBtn) submitBtn.disabled = false;
@@ -533,8 +553,10 @@ async function loadProfile(user) {
       .maybeSingle();
 
     if (error) {
-      console.error("Erro ao consultar profiles:", error);
-      $("login-error").textContent = `Não foi possível ler seu perfil no banco (${error.message || "verifique as políticas RLS de profiles"}).`;
+      console.error("Erro ao consultar profiles:", formatSupabaseError(error), error);
+      $("login-error").textContent = isAuth401Error(error)
+        ? "Erro 401 ao ler perfil: verifique SUPABASE_ANON_KEY em assets/app.js e a sessão do usuário."
+        : `Não foi possível ler seu perfil no banco (${error.message || "verifique as políticas RLS de profiles"}).`;
       return;
     }
 
@@ -545,7 +567,7 @@ async function loadProfile(user) {
 
     showApp(data, user);
   } catch (err) {
-    console.error("Falha inesperada em loadProfile:", err);
+    console.error("Falha inesperada em loadProfile:", formatSupabaseError(err), err);
     $("login-error").textContent = "Erro inesperado ao carregar o perfil institucional.";
   }
 }
@@ -786,7 +808,7 @@ async function loadProfiles() {
     fillTeacherSelect();
     renderClasses(getScopedClasses());
   } catch (e) {
-    console.warn("Não foi possível carregar perfis:", e);
+    console.warn("Não foi possível carregar perfis:", formatSupabaseError(e), e);
     fillSelect("class-teacher", [], x => x.full_name, "Não definido");
     $("users-body").innerHTML = '<tr><td colspan="5">Não foi possível carregar os usuários. Verifique as permissões da tabela profiles.</td></tr>';
   }
@@ -839,7 +861,7 @@ async function loadAll() {
           saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
         }
       } catch (e) {
-        console.warn("Tabela school_census_mappings não lida remotamente:", e);
+        console.warn("Tabela school_census_mappings não lida remotamente:", formatSupabaseError(e));
       }
     }
 
@@ -847,8 +869,13 @@ async function loadAll() {
     await loadProfiles();
     applySchoolScope();
   } catch (e) {
-    notice("Não foi possível carregar os dados. Verifique as políticas de acesso e a conexão com o banco.", true);
-    console.error(e);
+    const detail = formatSupabaseError(e);
+    console.error("Erro em loadAll:", detail, e);
+    if (isAuth401Error(e)) {
+      notice("Erro de autenticação (HTTP 401) ao consultar o Supabase. Confira a chave pública (SUPABASE_ANON_KEY) em assets/app.js e faça login novamente.", true);
+    } else {
+      notice(`Não foi possível carregar os dados (${detail}).`, true);
+    }
   }
 }
 
@@ -1118,12 +1145,17 @@ $("school-form")?.addEventListener("submit", async e => {
     notice(`Unidade escolar "${createdSchool.name}" cadastrada com sucesso! ID Escola: ${createdSchool.school_code}. Blocos do Censo migrados.`);
     await loadAll();
   } catch (err) {
-    console.error(err);
+    const detail = formatSupabaseError(err);
+    console.error("Erro ao cadastrar escola:", detail, err);
+    if (isAuth401Error(err)) {
+      notice("Erro de autenticação (HTTP 401) ao cadastrar escola. Verifique a chave pública do Supabase em assets/app.js e sua sessão.", true);
+      return;
+    }
     if (err?.code === "23505") {
       notice("Conflito ao gerar o ID escolar de 4 dígitos. Tente salvar novamente.", true);
       return;
     }
-    notice("Não foi possível cadastrar a escola. Verifique os dados informados e suas permissões.", true);
+    notice(`Não foi possível cadastrar a escola (${detail}).`, true);
   }
 });
 
@@ -1175,8 +1207,9 @@ $("schools-body")?.addEventListener("click", async e => {
       notice("Escola removida com sucesso.");
       await loadAll();
     } catch (err) {
-      console.error(err);
-      notice("Não foi possível excluir a escola. Verifique se há alunos, turmas ou usuários vinculados a ela.", true);
+      const detail = formatSupabaseError(err);
+      console.error("Erro ao excluir escola:", detail, err);
+      notice(`Não foi possível excluir a escola (${detail}).`, true);
       delBtn.disabled = false;
     }
     return;
@@ -1277,7 +1310,7 @@ $("classes-body")?.addEventListener("change", async e => {
     notice("Professor da turma atualizado com sucesso.");
     await loadAll();
   } catch (err) {
-    console.error(err);
+    console.error("Erro ao atualizar professor:", formatSupabaseError(err), err);
     notice("Não foi possível atualizar o professor da turma.", true);
     select.disabled = false;
   }
@@ -1840,7 +1873,7 @@ async function persistCensusEntry(entry) {
 
   if (supabase) {
     try {
-      await supabase.from("school_census_mappings").upsert({
+      const { error } = await supabase.from("school_census_mappings").upsert({
         school_id: entry.school_id,
         census_year: entry.census_year,
         operating_status: entry.operating_status,
@@ -1850,8 +1883,11 @@ async function persistCensusEntry(entry) {
         modules_data: entry.modules || {},
         updated_by: currentProfile?.id || null
       }, { onConflict: "school_id,census_year" });
+      if (error) {
+        console.warn("Sincronização remota do Censo não aplicada:", formatSupabaseError(error));
+      }
     } catch (err) {
-      console.warn("Sincronização remota do Censo não aplicada (verifique tabela school_census_mappings):", err);
+      console.warn("Sincronização remota do Censo falhou:", formatSupabaseError(err));
     }
   }
 }
@@ -1894,9 +1930,11 @@ async function syncSchoolRecordFromCensusModules(school, modulesData, formData =
       cachedSchools = cachedSchools.map(s => s.id === school.id ? updatedSchool : s);
       updateHomeSchoolCard();
       updateRoleLabel();
+    } else if (error) {
+      console.warn("Atualização espelhada de schools não aplicada:", formatSupabaseError(error));
     }
   } catch (err) {
-    console.warn("Não foi possível atualizar os dados espelhados da escola:", err);
+    console.warn("Não foi possível atualizar os dados espelhados da escola:", formatSupabaseError(err));
   }
 }
 
@@ -2033,7 +2071,7 @@ $("users-body")?.addEventListener("click", async e => {
     notice("Usuário removido com sucesso.");
     await loadProfiles();
   } catch (err) {
-    console.error(err);
+    console.error("Erro ao excluir usuário:", formatSupabaseError(err), err);
     notice(err.message || "Não foi possível excluir o usuário.", true);
     btn.disabled = false;
   }
@@ -2077,7 +2115,7 @@ if (userForm) {
       notice("Usuário cadastrado com sucesso.");
       await loadProfiles();
     } catch (err) {
-      console.error(err);
+      console.error("Erro ao cadastrar usuário:", formatSupabaseError(err), err);
       notice(err.message || "Erro ao cadastrar usuário. Verifique se a Edge Function create-user está publicada no Supabase.", true);
     }
   });
@@ -2147,7 +2185,12 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
       await loadAll();
       if (onSuccess && data) onSuccess(data);
     } catch (err) {
-      console.error(err);
+      const detail = formatSupabaseError(err);
+      console.error(`Erro ao salvar em ${table}:`, detail, err);
+      if (isAuth401Error(err)) {
+        notice("Erro de autenticação (HTTP 401) ao salvar. Verifique a chave pública do Supabase em assets/app.js.", true);
+        return;
+      }
       if (err?.code === "23505" && table === "students") {
         notice("Já existe um aluno cadastrado com este CPF.", true);
         return;
@@ -2156,7 +2199,7 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
         notice(err.message || "CPF inválido: informe 11 dígitos numéricos.", true);
         return;
       }
-      notice("Não foi possível salvar. Verifique os campos obrigatórios e suas permissões.", true);
+      notice(`Não foi possível salvar (${detail}).`, true);
     }
   });
 }
@@ -2248,8 +2291,9 @@ $("class-form")?.addEventListener("submit", async e => {
     notice(`Turma criada com sucesso! Código da turma: ${classCode}.`);
     await loadAll();
   } catch (err) {
-    console.error(err);
-    notice("Não foi possível criar a turma. Verifique os campos obrigatórios, o banco de dados e suas permissões.", true);
+    const detail = formatSupabaseError(err);
+    console.error("Erro ao criar turma:", detail, err);
+    notice(`Não foi possível criar a turma (${detail}).`, true);
   }
 });
 
@@ -2320,8 +2364,9 @@ $("enrollment-form")?.addEventListener("submit", async e => {
     notice(targetIsAee ? "Aluno enturmado na turma de AEE com sucesso." : "Aluno enturmado na turma regular com sucesso.");
     await loadAll();
   } catch (err) {
-    console.error(err);
-    notice("Não foi possível enturmar o aluno. Verifique os campos obrigatórios e suas permissões.", true);
+    const detail = formatSupabaseError(err);
+    console.error("Erro ao enturmar aluno:", detail, err);
+    notice(`Não foi possível enturmar o aluno (${detail}).`, true);
   }
 });
 
@@ -2345,7 +2390,7 @@ async function loadLessons() {
       `<tr><td>${escapeHtml(l.lesson_date)}</td><td>${escapeHtml(l.classes?.name || "—")}</td><td>${escapeHtml(l.subject)}</td><td>${escapeHtml(l.content)}</td></tr>`
     ).join("") || '<tr><td colspan="4">Nenhuma aula registrada.</td></tr>';
   } catch (e) {
-    console.error(e);
+    console.error("Erro ao carregar aulas:", formatSupabaseError(e), e);
   }
 }
 
@@ -2379,7 +2424,7 @@ $("load-attendance")?.addEventListener("click", async () => {
     );
     $("save-attendance")?.classList.toggle("hidden", attendanceRows.length === 0);
   } catch (e) {
-    console.error(e);
+    console.error("Erro ao carregar frequência:", formatSupabaseError(e), e);
     notice("Não foi possível carregar a lista de alunos.", true);
   }
 });
@@ -2403,7 +2448,7 @@ $("save-attendance")?.addEventListener("click", async () => {
     if (error) throw error;
     notice("Frequência salva com sucesso.");
   } catch (e) {
-    console.error(e);
+    console.error("Erro ao salvar frequência:", formatSupabaseError(e), e);
     notice("Não foi possível salvar a frequência. Verifique as permissões.", true);
   }
 });
