@@ -366,7 +366,13 @@ function getActiveSchool() {
 }
 
 function updateHomeSchoolCard() {
-  const activeSchool = getActiveSchool();
+  const card = $("school-identity-card");
+  const showIdentityCard = isSchoolUnitProfile();
+  const activeSchool = showIdentityCard ? getActiveSchool() : null;
+
+  if (card) {
+    card.classList.toggle("hidden", !showIdentityCard);
+  }
 
   if ($("home-school-id")) {
     $("home-school-id").textContent = activeSchool?.school_code || "—";
@@ -379,10 +385,10 @@ function updateHomeSchoolCard() {
   }
 
   if ($("inicio-school-subtitle")) {
-    if (activeSchool) {
+    if (showIdentityCard && activeSchool) {
       $("inicio-school-subtitle").textContent = `Unidade ativa: ${activeSchool.name} · ID ${activeSchool.school_code || "—"} · INEP ${activeSchool.inep_code || "Não informado"}.`;
     } else if (isSecretaria()) {
-      $("inicio-school-subtitle").textContent = "Visualização geral da rede municipal. Selecione uma escola na barra superior para detalhar.";
+      $("inicio-school-subtitle").textContent = "Acompanhe as informações gerais da rede municipal e das unidades escolares.";
     } else {
       $("inicio-school-subtitle").textContent = "Acompanhe as informações da sua unidade escolar.";
     }
@@ -1111,10 +1117,6 @@ $("school-form")?.addEventListener("submit", async e => {
 
     notice(`Unidade escolar "${createdSchool.name}" cadastrada com sucesso! ID Escola: ${createdSchool.school_code}. Blocos do Censo migrados.`);
     await loadAll();
-
-    if (isSecretaria() && createdSchool?.id) {
-      setActiveSchool(createdSchool, true);
-    }
   } catch (err) {
     console.error(err);
     if (err?.code === "23505") {
@@ -1184,7 +1186,7 @@ $("schools-body")?.addEventListener("click", async e => {
   const row = e.target.closest("[data-select-school]");
   if (!row) return;
   const school = cachedSchools.find(s => s.id === row.dataset.selectSchool);
-  if (school) setActiveSchool(school, true);
+  if (school) setActiveSchool(school, false);
 });
 
 function renderStudents(rows = getScopedStudents()) {
