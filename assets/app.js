@@ -22,13 +22,14 @@ const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v2";
 const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
 const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v2";
 
-// 21 blocos exibidos na seção CENSO ESCOLAR
+// 21 blocos exibidos no cadastro da unidade escolar e na seção CENSO ESCOLAR
 const CENSUS_MODULES = [
   {
     key: "identificacao_escola",
     label: "Identificação Escola",
     icon: "||| |||",
     fields: [
+      { name: "nome_escola", label: "Nome da escola", placeholder: "Ex.: E.M. Monteiro Lobato" },
       { name: "codigo_inep", label: "Código INEP", placeholder: "Ex.: 29235146" },
       { name: "situacao_funcionamento", label: "Situação de funcionamento", options: ["Em atividade", "Paralisada", "Extinta"] },
       { name: "dependencia_administrativa", label: "Dependência administrativa", options: ["Municipal", "Estadual", "Federal", "Privada"] },
@@ -362,7 +363,6 @@ function getActiveSchool() {
 function updateHomeSchoolCard() {
   const activeSchool = getActiveSchool();
 
-  // Exibe ID Escola, INEP e Currículo apenas quando há uma unidade escolar específica vinculada ou selecionada
   if ($("home-school-id")) {
     $("home-school-id").textContent = activeSchool?.school_code || "—";
   }
@@ -850,7 +850,7 @@ function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getSc
   }
 }
 
-// --- ESCOLAS (COM ID 4 DÍGITOS, GESTOR, CURRÍCULO, BLOCOS DO CENSO NO CADASTRO E EXCLUSÃO PELA SECRETARIA) ---
+// --- ESCOLAS (CADASTRO EXCLUSIVAMENTE PELOS BLOCOS TEMÁTICOS DO CENSO ESCOLAR) ---
 function renderSchoolFormCensusGrid() {
   const grid = $("school-census-modules-grid");
   if (!grid) return;
@@ -879,17 +879,21 @@ function openSchoolFormCensusModule(modKey) {
   activeDraftSchoolModuleKey = modKey;
   renderSchoolFormCensusGrid();
 
-  const schoolFormEl = $("school-form");
-  const formData = schoolFormEl ? formObject(schoolFormEl) : {};
   const saved = draftSchoolCensusModules[modKey] || {};
+  const idDraft = draftSchoolCensusModules.identificacao_escola || {};
+  const addrDraft = draftSchoolCensusModules.endereco || {};
+  const contactDraft = draftSchoolCensusModules.contatos || {};
+  const managerDraft = draftSchoolCensusModules.dados_gestor || {};
+  const orgDraft = draftSchoolCensusModules.organizacao_ensino || {};
 
   const getInitialVal = (fieldName) => {
     if (saved[fieldName] !== undefined) return saved[fieldName];
-    if (modKey === "identificacao_escola" && fieldName === "codigo_inep") return formData.inep_code || "";
-    if (modKey === "endereco" && fieldName === "logradouro") return formData.address || "";
-    if (modKey === "contatos" && fieldName === "telefone_principal") return formData.phone || "";
-    if (modKey === "dados_gestor" && fieldName === "nome_gestor") return formData.manager_name || "";
-    if (modKey === "organizacao_ensino" && fieldName === "etapas_ofertadas") return formData.curriculum_offer || "";
+    if (modKey === "identificacao_escola" && fieldName === "nome_escola") return idDraft.nome_escola || "";
+    if (modKey === "identificacao_escola" && fieldName === "codigo_inep") return idDraft.codigo_inep || "";
+    if (modKey === "endereco" && fieldName === "logradouro") return addrDraft.logradouro || "";
+    if (modKey === "contatos" && fieldName === "telefone_principal") return contactDraft.telefone_principal || "";
+    if (modKey === "dados_gestor" && fieldName === "nome_gestor") return managerDraft.nome_gestor || "";
+    if (modKey === "organizacao_ensino" && fieldName === "etapas_ofertadas") return orgDraft.etapas_ofertadas || "";
     return "";
   };
 
@@ -939,6 +943,99 @@ $("school-census-apply-module")?.addEventListener("click", () => {
   renderSchoolFormCensusGrid();
   const label = CENSUS_MODULES.find(m => m.key === activeDraftSchoolModuleKey)?.label || "Bloco";
   notice(`Bloco "${label}" preparado para o cadastro da escola.`);
+});
+
+$("school-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!isSecretaria()) {
+    notice("Apenas o perfil Secretaria de Educação pode cadastrar escolas.", true);
+    return;
+  }
+
+  if (activeDraftSchoolModuleKey) {
+    const modValues = {};
+    document.querySelectorAll("#school-census-module-fields [data-draft-census-field]").forEach(el => {
+      modValues[el.dataset.draftCensusField] = String(el.value || "").trim();
+    });
+    draftSchoolCensusModules[activeDraftSchoolModuleKey] = modValues;
+  }
+
+  const idBlock = draftSchoolCensusModules.identificacao_escola || {};
+  const schoolName = String(idBlock.nome_escola || "").trim();
+  if (!schoolName) {
+    openSchoolFormCensusModule("identificacao_escola");
+    notice("Informe o Nome da escola no bloco Identificação Escola antes de cadastrar.", true);
+    return;
+  }
+
+  const addrBlock = draftSchoolCensusModules.endereco || {};
+  const contactBlock = draftSchoolCensusModules.contatos || {};
+  const managerBlock = draftSchoolCensusModules.dados_gestor || {};
+  const orgBlock = draftSchoolCensusModules.organizacao_ensino || {};
+
+  const fullAddress = [addrBlock.logradouro, addrBlock.numero_bairro, addrBlock.cep]
+    .map(v => String(v || "").trim())
+    .filter(Boolean)
+    .join(" · ");
+
+  const schoolPayload = {
+    school_code: generateFourDigitSchoolCode(),
+    name: schoolName,
+    manager_name: String(managerBlock.nome_gestor || "").trim() || null,
+    inep_code: String(idBlock.codigo_inep || "").trim() || null,
+    curriculum_offer: String(orgBlock.etapas_ofertadas || "Comum").trim() || "Comum",
+    address: fullAddress || null,
+    phone: String(contactBlock.telefone_principal || "").trim() || null
+  };
+
+  try {
+    const { data: createdSchool, error } = await supabase
+      .from("schools")
+      .insert(schoolPayload)
+      .select()
+      .single();
+    if (error) throw error;
+
+    if (createdSchool?.id) {
+      const year = new Date().getFullYear();
+      await persistCensusEntry({
+        id: `censo-${createdSchool.id}-${year}`,
+        school_id: createdSchool.id,
+        school_name: createdSchool.name,
+        census_year: year,
+        operating_status: idBlock.situacao_funcionamento || "Em atividade",
+        offered_stages: orgBlock.etapas_ofertadas || createdSchool.curriculum_offer || "Comum",
+        infrastructure_notes: draftSchoolCensusModules.computadores_internet?.acesso_internet || "",
+        validation_status: "Em conferência",
+        modules: {
+          ...draftSchoolCensusModules,
+          identificacao_escola: {
+            ...idBlock,
+            nome_escola: createdSchool.name
+          }
+        }
+      });
+    }
+
+    draftSchoolCensusModules = {};
+    activeDraftSchoolModuleKey = null;
+    $("school-census-module-editor")?.classList.add("hidden");
+    renderSchoolFormCensusGrid();
+
+    notice(`Unidade escolar cadastrada com sucesso! ID Escola: ${createdSchool.school_code}.`);
+    await loadAll();
+
+    if (isSecretaria() && createdSchool?.id) {
+      setActiveSchool(createdSchool, true);
+    }
+  } catch (err) {
+    console.error(err);
+    if (err?.code === "23505") {
+      notice("Conflito ao gerar o ID escolar de 4 dígitos. Tente salvar novamente.", true);
+      return;
+    }
+    notice("Não foi possível cadastrar a escola. Verifique os dados informados e suas permissões.", true);
+  }
 });
 
 function renderSchools(visibleSchools = getScopedSchools()) {
@@ -1342,6 +1439,7 @@ function countFilledCensusModules(entry) {
 
 function getDefaultFieldValueForModule(modKey, fieldName, school) {
   if (!school) return "";
+  if (modKey === "identificacao_escola" && fieldName === "nome_escola") return school.name || "";
   if (modKey === "identificacao_escola" && fieldName === "codigo_inep") return school.inep_code || "";
   if (modKey === "endereco" && fieldName === "logradouro") return school.address || "";
   if (modKey === "contatos" && fieldName === "telefone_principal") return school.phone || "";
@@ -1358,7 +1456,6 @@ function renderCensusModulesGrid() {
   const schoolId = getSelectedCensusSchoolId();
   const school = cachedSchools.find(s => s.id === schoolId);
 
-  // Aparece apenas quando há uma escola específica vinculada (secretário escolar / gestor) ou selecionada
   if (!school) {
     blocksSection.classList.add("hidden");
     activeCensusModuleKey = null;
@@ -1760,7 +1857,6 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
       const { data, error } = await supabase.from(table).insert(obj).select().single();
       if (error) throw error;
       form.reset();
-      if (form.elements["curriculum_offer"]) form.elements["curriculum_offer"].value = "Comum";
       if (form.elements["race_color"]) form.elements["race_color"].value = "Não declarada";
       if (form.elements["is_pcd"]) form.elements["is_pcd"].value = "false";
       if (form.elements["uses_school_transport"]) form.elements["uses_school_transport"].value = "false";
@@ -1773,21 +1869,13 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
         if ($("monitor-school")) $("monitor-school").value = effectiveId;
         if ($("census-school")) $("census-school").value = effectiveId;
       }
-      notice(
-        table === "schools" && data?.school_code
-          ? `Unidade escolar cadastrada com sucesso! ID Escola: ${data.school_code}.`
-          : "Registro salvo com sucesso."
-      );
+      notice("Registro salvo com sucesso.");
       await loadAll();
       if (onSuccess && data) onSuccess(data);
     } catch (err) {
       console.error(err);
       if (err?.code === "23505" && table === "students") {
         notice("Já existe um aluno cadastrado com este CPF.", true);
-        return;
-      }
-      if (err?.code === "23505" && table === "schools") {
-        notice("Conflito ao gerar o ID escolar de 4 dígitos. Tente salvar novamente.", true);
         return;
       }
       if (err?.code === "22023") {
@@ -1798,53 +1886,6 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
     }
   });
 }
-
-insertForm(
-  "school-form",
-  "schools",
-  x => ({
-    school_code: generateFourDigitSchoolCode(),
-    name: String(x.name || "").trim(),
-    manager_name: String(x.manager_name || "").trim() || null,
-    inep_code: String(x.inep_code || "").trim() || null,
-    curriculum_offer: String(x.curriculum_offer || "Comum").trim() || "Comum",
-    address: String(x.address || "").trim() || null,
-    phone: String(x.phone || "").trim() || null
-  }),
-  async (createdSchool) => {
-    if (activeDraftSchoolModuleKey) {
-      const modValues = {};
-      document.querySelectorAll("#school-census-module-fields [data-draft-census-field]").forEach(el => {
-        modValues[el.dataset.draftCensusField] = String(el.value || "").trim();
-      });
-      draftSchoolCensusModules[activeDraftSchoolModuleKey] = modValues;
-    }
-
-    if (Object.keys(draftSchoolCensusModules).length > 0 && createdSchool?.id) {
-      const year = new Date().getFullYear();
-      await persistCensusEntry({
-        id: `censo-${createdSchool.id}-${year}`,
-        school_id: createdSchool.id,
-        school_name: createdSchool.name,
-        census_year: year,
-        operating_status: draftSchoolCensusModules.identificacao_escola?.situacao_funcionamento || "Em atividade",
-        offered_stages: draftSchoolCensusModules.organizacao_ensino?.etapas_ofertadas || createdSchool.curriculum_offer || "Comum",
-        infrastructure_notes: draftSchoolCensusModules.computadores_internet?.acesso_internet || "",
-        validation_status: "Em conferência",
-        modules: { ...draftSchoolCensusModules }
-      });
-    }
-
-    draftSchoolCensusModules = {};
-    activeDraftSchoolModuleKey = null;
-    $("school-census-module-editor")?.classList.add("hidden");
-    renderSchoolFormCensusGrid();
-
-    if (isSecretaria() && createdSchool?.id) {
-      setActiveSchool(createdSchool, true);
-    }
-  }
-);
 
 insertForm(
   "student-form",
@@ -1963,7 +2004,6 @@ $("enrollment-form")?.addEventListener("submit", async e => {
   const targetClass = cachedClasses.find(c => c.id === classId);
   const targetIsAee = isAeeClass(targetClass);
 
-  // Impede duplicidade exata na mesma turma/ano, mas permite 1 turma regular + 1 turma de AEE no mesmo ano letivo
   const sameYearEnrollments = cachedEnrollments.filter(
     en => en.student_id === studentId && Number(en.school_year) === schoolYear && en.status !== "cancelada"
   );
