@@ -73,6 +73,20 @@ function generateFourDigitClassCode() {
   return generateFourDigitCode(cachedClasses, "class_code");
 }
 
+function isAeeClass(cls) {
+  if (!cls) return false;
+  if (String(cls.aee_service || "").trim().toLowerCase() === "sim") return true;
+  if (String(cls.modality || "").trim().toLowerCase() === "educação especial") return true;
+  return /\baee\b/i.test(String(cls.name || "")) || /\baee\b/i.test(String(cls.grade_level || ""));
+}
+
+function isPcdStudent(student) {
+  if (!student) return false;
+  if (student.is_pcd === true) return true;
+  const val = String(student.is_pcd || "").trim().toLowerCase();
+  return val === "true" || val === "sim" || val === "1";
+}
+
 function normalizeCpf(value) {
   return String(value || "").replace(/\D/g, "");
 }
@@ -463,6 +477,15 @@ function getScopedTeachers(schoolIdFilter = "") {
   );
 }
 
+function getActiveStudentCountForClass(classId) {
+  const activeStudentIds = new Set(
+    cachedEnrollments
+      .filter(e => e.class_id === classId && e.status === "ativa" && e.student_id)
+      .map(e => e.student_id)
+  );
+  return activeStudentIds.size;
+}
+
 function applySchoolScope() {
   updateRoleLabel();
   updateHomeSchoolCard();
@@ -471,21 +494,38 @@ function applySchoolScope() {
   const scopedClasses = getScopedClasses();
   const scopedEnrollments = getScopedEnrollments();
 
+  const activeEnrollments = scopedEnrollments.filter(e => e.status === "ativa");
   const activeStudentIds = new Set(
-    scopedEnrollments
-      .filter(e => e.status === "ativa" && e.student_id)
-      .map(e => e.student_id)
+    activeEnrollments.filter(e => e.student_id).map(e => e.student_id)
   );
   const activeStudentsCount = activeStudentIds.size;
+
+  const classById = new Map(cachedClasses.map(c => [c.id, c]));
+  const aeeActiveStudentIds = new Set(
+    activeEnrollments
+      .filter(e => e.student_id && isAeeClass(classById.get(e.class_id)))
+      .map(e => e.student_id)
+  );
+  const aeeEnrolledCount = aeeActiveStudentIds.size;
+
+  const pcdStudentsCount = scopedStudents.filter(s => isPcdStudent(s)).length;
 
   if ($("stat-escolas")) $("stat-escolas").textContent = scopedSchools.length;
   if ($("stat-alunos")) $("stat-alunos").textContent = scopedStudents.length;
   if ($("stat-turmas")) $("stat-turmas").textContent = scopedClasses.length;
   if ($("stat-matriculas")) $("stat-matriculas").textContent = activeStudentsCount;
+  if ($("stat-aee")) $("stat-aee").textContent = aeeEnrolledCount;
+  if ($("stat-pcd")) $("stat-pcd").textContent = pcdStudentsCount;
+
+  if ($("enrollments-aee-count")) $("enrollments-aee-count").textContent = aeeEnrolledCount;
+  if ($("enrollments-pcd-count")) $("enrollments-pcd-count").textContent = pcdStudentsCount;
+  if ($("enrollments-active-count")) $("enrollments-active-count").textContent = activeStudentsCount;
 
   if ($("report-students")) $("report-students").textContent = scopedStudents.length;
   if ($("report-classes")) $("report-classes").textContent = scopedClasses.length;
   if ($("report-enrollments")) $("report-enrollments").textContent = activeStudentsCount;
+  if ($("report-aee")) $("report-aee").textContent = aeeEnrolledCount;
+  if ($("report-pcd")) $("report-pcd").textContent = pcdStudentsCount;
 
   renderSchools(scopedSchools);
   renderStudents(scopedStudents);
@@ -546,7 +586,7 @@ async function loadAll() {
       fetchRows("schools"),
       fetchRows("students", "*, schools(name)"),
       fetchRows("classes", "*, schools(name)"),
-      fetchRows("enrollments", "*, students(full_name), classes(name)")
+      fetchRows("enrollments", "*, students(full_name, is_pcd), classes(name, aee_service, modality)")
     ]);
     cachedSchools = schools;
     cachedStudents = students;
@@ -573,7 +613,8 @@ function fillSelect(id, items, labelFn, placeholder = "Selecione") {
 function formatClassLabel(c) {
   const codePrefix = c.class_code ? `[${c.class_code}] ` : "";
   const comp = c.class_complement ? ` (${c.class_complement})` : "";
-  return `${codePrefix}${c.name}${comp} — ${c.grade_level}`;
+  const tipo = isAeeClass(c) ? " · AEE" : " · Regular";
+  return `${codePrefix}${c.name}${comp} — ${c.grade_level}${tipo}`;
 }
 
 function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getScopedClasses()) {
@@ -587,7 +628,7 @@ function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getSc
   fillSelect("user-school", cachedSchools, x => x.name, "Rede / Não vinculada");
   fillSelect("monitor-school", availableSchools, x => x.name, isSecretaria() ? "Rede / Todas as escolas" : "Selecione a escola");
   fillSelect("census-school", availableSchools, x => formatSchoolOption(x), "Selecione a escola");
-  fillSelect("enrollment-student", scopedStudents, x => x.full_name);
+  fillSelect("enrollment-student", scopedStudents, x => `${x.full_name}${isPcdStudent(x) ? " (PcD)" : ""}`);
   fillSelect("enrollment-class", scopedClasses, x => formatClassLabel(x));
   fillSelect("diary-class", scopedClasses, x => formatClassLabel(x));
   fillSelect("attendance-class", scopedClasses, x => formatClassLabel(x));
@@ -673,10 +714,11 @@ function renderStudents(rows = getScopedStudents()) {
       <td>${escapeHtml(s.full_name)}</td>
       <td>${escapeHtml(formatCpf(s.cpf))}</td>
       <td>${escapeHtml(s.birth_date || "—")}</td>
+      <td>${isPcdStudent(s) ? "Sim" : "Não"}</td>
       <td>${escapeHtml(s.guardian_name || "—")}</td>
       <td>${escapeHtml(s.schools?.name || "—")}</td>
     </tr>`
-  ).join("") || '<tr><td colspan="5">Nenhum aluno cadastrado.</td></tr>';
+  ).join("") || '<tr><td colspan="6">Nenhum aluno cadastrado.</td></tr>';
 }
 
 function formatSchedule(startTime, endTime) {
@@ -692,6 +734,8 @@ function renderClasses(rows = getScopedClasses()) {
   $("classes-body").innerHTML = rows.map(c => {
     const classTeachers = getScopedTeachers(c.school_id);
     const currentTeacher = cachedProfiles.find(p => p.id === c.teacher_id);
+    const activeCount = getActiveStudentCountForClass(c.id);
+    const isAee = isAeeClass(c);
     const teacherCell = canAssignTeacher
       ? `<select data-assign-teacher="${escapeHtml(c.id)}">
           <option value="">Não definido</option>
@@ -705,13 +749,14 @@ function renderClasses(rows = getScopedClasses()) {
       <td>${escapeHtml(c.class_complement || "—")}</td>
       <td>${escapeHtml(c.grade_level)}</td>
       <td>${escapeHtml(c.modality || "Regular")}</td>
-      <td>${escapeHtml(c.mediation_type || "Presencial")}</td>
+      <td>${isAee ? "Sim (AEE)" : "Não"}</td>
+      <td><strong>${activeCount}</strong></td>
       <td>${escapeHtml(formatSchedule(c.start_time, c.end_time))}</td>
       <td>${c.school_year}</td>
       <td>${escapeHtml(c.schools?.name || "—")}</td>
       <td>${teacherCell}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="10">Nenhuma turma cadastrada.</td></tr>';
+  }).join("") || '<tr><td colspan="11">Nenhuma turma cadastrada.</td></tr>';
 }
 
 $("classes-body")?.addEventListener("change", async e => {
@@ -757,9 +802,23 @@ $("classes-body")?.addEventListener("change", async e => {
 
 function renderEnrollments(rows = getScopedEnrollments()) {
   if (!$("enrollments-body")) return;
-  $("enrollments-body").innerHTML = rows.map(e =>
-    `<tr><td>${escapeHtml(e.students?.full_name || "—")}</td><td>${escapeHtml(e.classes?.name || "—")}</td><td>${e.school_year}</td><td>${escapeHtml(e.status)}</td></tr>`
-  ).join("") || '<tr><td colspan="4">Nenhuma matrícula cadastrada.</td></tr>';
+  const classById = new Map(cachedClasses.map(c => [c.id, c]));
+  const studentById = new Map(cachedStudents.map(s => [s.id, s]));
+
+  $("enrollments-body").innerHTML = rows.map(e => {
+    const cls = e.classes || classById.get(e.class_id);
+    const stu = e.students || studentById.get(e.student_id);
+    const pcdLabel = isPcdStudent(stu) ? "Sim" : "Não";
+    const classType = isAeeClass(cls) ? "AEE" : "Regular";
+    return `<tr>
+      <td>${escapeHtml(stu?.full_name || "—")}</td>
+      <td>${pcdLabel}</td>
+      <td>${escapeHtml(cls?.name || "—")}</td>
+      <td>${classType}</td>
+      <td>${e.school_year}</td>
+      <td>${escapeHtml(e.status)}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="6">Nenhuma matrícula cadastrada.</td></tr>';
 }
 
 function renderUsers() {
@@ -1180,6 +1239,7 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
       if (error) throw error;
       form.reset();
       if (form.elements["curriculum_offer"]) form.elements["curriculum_offer"].value = "Comum";
+      if (form.elements["is_pcd"]) form.elements["is_pcd"].value = "false";
       document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
       if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
       const effectiveId = getEffectiveSchoolId();
@@ -1235,6 +1295,7 @@ insertForm(
   x => ({
     ...x,
     cpf: validateAndNormalizeCpf(x.cpf, "CPF do aluno").cpf,
+    is_pcd: x.is_pcd === "true" || x.is_pcd === true,
     school_id: isSecretaria() ? x.school_id : getEffectiveSchoolId(),
     birth_date: x.birth_date || null,
     guardian_name: x.guardian_name || null,
@@ -1340,6 +1401,34 @@ $("enrollment-form")?.addEventListener("submit", async e => {
     return;
   }
 
+  const targetClass = cachedClasses.find(c => c.id === classId);
+  const targetIsAee = isAeeClass(targetClass);
+
+  // Impede duplicidade exata na mesma turma/ano, mas permite 1 turma regular + 1 turma de AEE no mesmo ano letivo
+  const sameYearEnrollments = cachedEnrollments.filter(
+    en => en.student_id === studentId && Number(en.school_year) === schoolYear && en.status !== "cancelada"
+  );
+
+  if (sameYearEnrollments.some(en => en.class_id === classId)) {
+    notice("Este aluno já possui matrícula registrada nesta turma para o ano letivo informado.", true);
+    return;
+  }
+
+  const sameCategoryCount = sameYearEnrollments.filter(en => {
+    const existingClass = cachedClasses.find(c => c.id === en.class_id);
+    return isAeeClass(existingClass) === targetIsAee;
+  }).length;
+
+  if (sameCategoryCount >= 1) {
+    notice(
+      targetIsAee
+        ? "O aluno já está matriculado em uma turma de AEE neste ano letivo."
+        : "O aluno já está matriculado em uma turma regular neste ano letivo.",
+      true
+    );
+    return;
+  }
+
   try {
     const { error } = await supabase.from("enrollments").insert({
       student_id: studentId,
@@ -1351,7 +1440,7 @@ $("enrollment-form")?.addEventListener("submit", async e => {
 
     e.target.reset();
     document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
-    notice("Aluno enturmado com sucesso.");
+    notice(targetIsAee ? "Aluno enturmado na turma de AEE com sucesso." : "Aluno enturmado na turma regular com sucesso.");
     await loadAll();
   } catch (err) {
     console.error(err);
