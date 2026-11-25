@@ -15,8 +15,9 @@ const configured =
 const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 let currentProfile = null;
 let selectedSchoolId = "";
-let cachedSchools = [], cachedStudents = [], cachedClasses = [], cachedEnrollments = [], cachedProfiles = [];
+let cachedSchools = [], cachedStudents = [], cachedClasses = [], cachedEnrollments = [], cachedProfiles = [], cachedLessons = [];
 let attendanceRows = [];
+let activeLessonDetailSchoolId = null;
 
 const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v2";
 const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
@@ -527,7 +528,13 @@ function go(page) {
   }
   if (page === "censo" && canAccessCensus()) renderCensus();
   if (page === "escolas") renderSchoolFormCensusGrid();
-  if (page === "relatorios") renderReportSection();
+  if (page === "relatorios") {
+    if (isSecretaria()) {
+      initSecretariaLessonMonitoringControls();
+      loadSecretariaLessonsMonitorData();
+    }
+    renderReportSection();
+  }
 }
 
 document.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.page)));
@@ -790,7 +797,6 @@ function computeSecretariaGeneralReport() {
       .filter(c => c.school_id && registeredSchoolIds.has(c.school_id) && isAeeClass(c))
       .map(c => c.id)
   );
-  const studentById = new Map(cachedStudents.map(s => [s.id, s]));
   const specialEnrollmentStudentIds = new Set();
 
   for (const en of cachedEnrollments) {
@@ -829,6 +835,328 @@ function computeSecretariaGeneralReport() {
   };
 }
 
+// --- ANÁLISE DE DADOS — REGISTROS DE AULAS (APENAS PERFIL SECRETARIA) ---
+function parseLessonDateToMs(dateStr) {
+  if (!dateStr) return null;
+  const clean = String(dateStr).trim();
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(clean);
+  if (isoMatch) {
+    return Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+  }
+  const parsed = Date.parse(clean);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function formatBrDateFromMs(ms) {
+  if (!ms) return "—";
+  const d = new Date(ms);
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = d.getUTCFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function getDaysSinceMs(ms) {
+  if (!ms) return null;
+  const now = new Date();
+  const todayUtcMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const diffDays = Math.floor((todayUtcMs - ms) / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+}
+
+function initSecretariaLessonMonitoringControls() {
+  if (!isSecretaria()) return;
+  const yearSelect = $("sec-lessons-year");
+  const schoolSelect = $("sec-lessons-school");
+
+  if (yearSelect) {
+    const currentYear = new Date().getFullYear();
+    const yearsSet = new Set([currentYear, currentYear - 1, 2026]);
+    for (const c of cachedClasses) {
+      if (c.school_year) yearsSet.add(Number(c.school_year));
+    }
+    for (const l of cachedLessons) {
+      const ms = parseLessonDateToMs(l.lesson_date);
+      if (ms) yearsSet.add(new Date(ms).getUTCFullYear());
+    }
+    const years = Array.from(yearsSet).filter(Boolean).sort((a, b) => b - a);
+    const prevYear = yearSelect.value;
+    yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
+    if (prevYear && years.includes(Number(prevYear))) {
+      yearSelect.value = prevYear;
+    } else if (years.includes(2026)) {
+      yearSelect.value = "2026";
+    } else if (years.includes(currentYear)) {
+      yearSelect.value = String(currentYear);
+    }
+  }
+
+  if (schoolSelect) {
+    const prevSchool = schoolSelect.value;
+    const sortedSchools = [...cachedSchools].sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "pt-BR")
+    );
+    schoolSelect.innerHTML =
+      `<option value="">— Todas as escolas —</option>` +
+      sortedSchools.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join("");
+    if (prevSchool && sortedSchools.some(s => s.id === prevSchool)) {
+      schoolSelect.value = prevSchool;
+    } else if (selectedSchoolId && sortedSchools.some(s => s.id === selectedSchoolId)) {
+      schoolSelect.value = selectedSchoolId;
+    }
+  }
+}
+
+async function loadSecretariaLessonsMonitorData() {
+  if (!isSecretaria() || !supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from("lessons")
+      .select("id,class_id,lesson_date,subject,content,classes(id,name,school_id,school_year,grade_level,shift)")
+      .order("lesson_date", { ascending: false })
+      .limit(1000);
+    if (error) throw error;
+    cachedLessons = data || [];
+  } catch (err) {
+    console.warn("Não foi possível carregar registros de aulas para monitoramento:", formatSupabaseError(err));
+  }
+  renderSecretariaLessonsMonitor();
+}
+
+function buildSecretariaLessonMetrics() {
+  const selectedYear = Number($("sec-lessons-year")?.value) || new Date().getFullYear();
+  const selectedSchool = $("sec-lessons-school")?.value || "";
+
+  const classMap = new Map(cachedClasses.map(c => [c.id, c]));
+  const schoolMap = new Map(cachedSchools.map(s => [s.id, s]));
+
+  const targetSchools = selectedSchool
+    ? cachedSchools.filter(s => s.id === selectedSchool)
+    : cachedSchools;
+
+  const targetSchoolIds = new Set(targetSchools.map(s => s.id));
+
+  const yearClasses = cachedClasses.filter(c => {
+    const yearMatches = !c.school_year || Number(c.school_year) === selectedYear;
+    const schoolMatches = c.school_id && targetSchoolIds.has(c.school_id);
+    return yearMatches && schoolMatches;
+  });
+
+  const classStatsMap = new Map();
+  for (const cls of yearClasses) {
+    classStatsMap.set(cls.id, {
+      classItem: cls,
+      count: 0,
+      lastMs: null
+    });
+  }
+
+  for (const lesson of cachedLessons) {
+    const ms = parseLessonDateToMs(lesson.lesson_date);
+    if (!ms) continue;
+    const lessonYear = new Date(ms).getUTCFullYear();
+    if (lessonYear !== selectedYear) continue;
+
+    const cls = classMap.get(lesson.class_id) || lesson.classes;
+    const schoolId = cls?.school_id;
+    if (!schoolId || !targetSchoolIds.has(schoolId)) continue;
+
+    if (lesson.class_id && classStatsMap.has(lesson.class_id)) {
+      const st = classStatsMap.get(lesson.class_id);
+      st.count += 1;
+      if (!st.lastMs || ms > st.lastMs) st.lastMs = ms;
+    }
+  }
+
+  const schoolRows = targetSchools.map(school => {
+    const sClasses = yearClasses.filter(c => c.school_id === school.id);
+    let recordCount = 0;
+    let lastMs = null;
+
+    const schoolLessons = cachedLessons.filter(l => {
+      const ms = parseLessonDateToMs(l.lesson_date);
+      if (!ms || new Date(ms).getUTCFullYear() !== selectedYear) return false;
+      const cls = classMap.get(l.class_id) || l.classes;
+      return cls?.school_id === school.id;
+    });
+
+    recordCount = schoolLessons.length;
+    for (const l of schoolLessons) {
+      const ms = parseLessonDateToMs(l.lesson_date);
+      if (ms && (!lastMs || ms > lastMs)) lastMs = ms;
+    }
+
+    const daysWithoutLaunch = lastMs ? getDaysSinceMs(lastMs) : null;
+    const hasRecord = recordCount > 0;
+
+    return {
+      school,
+      classesCount: sClasses.length,
+      recordCount,
+      lastMs,
+      lastDateLabel: lastMs ? formatBrDateFromMs(lastMs) : "—",
+      daysWithoutLaunch,
+      hasRecord
+    };
+  }).sort((a, b) => String(a.school.name || "").localeCompare(String(b.school.name || ""), "pt-BR"));
+
+  const totalClassesCount = yearClasses.length;
+  const schoolsWithRecordCount = schoolRows.filter(r => r.hasRecord).length;
+  const schoolsWithoutRecordCount = schoolRows.filter(r => !r.hasRecord).length;
+
+  const rowsWithDays = schoolRows.filter(r => typeof r.daysWithoutLaunch === "number");
+  const avgDaysWithoutLaunch = rowsWithDays.length
+    ? Math.round(rowsWithDays.reduce((acc, r) => acc + r.daysWithoutLaunch, 0) / rowsWithDays.length)
+    : 0;
+
+  return {
+    selectedYear,
+    selectedSchool,
+    targetSchools,
+    yearClasses,
+    classStatsMap,
+    schoolRows,
+    totalClassesCount,
+    schoolsWithRecordCount,
+    schoolsWithoutRecordCount,
+    avgDaysWithoutLaunch
+  };
+}
+
+function renderSecretariaSchoolLessonDetail(metrics) {
+  const detailBox = $("sec-lessons-school-detail");
+  if (!detailBox) return;
+
+  if (!activeLessonDetailSchoolId) {
+    detailBox.classList.add("hidden");
+    return;
+  }
+
+  const school = cachedSchools.find(s => s.id === activeLessonDetailSchoolId);
+  if (!school) {
+    activeLessonDetailSchoolId = null;
+    detailBox.classList.add("hidden");
+    return;
+  }
+
+  const schoolClasses = metrics.yearClasses.filter(c => c.school_id === school.id);
+  detailBox.classList.remove("hidden");
+  if ($("sec-lessons-detail-title")) {
+    $("sec-lessons-detail-title").textContent = `Turmas — ${school.name}`;
+  }
+  if ($("sec-lessons-detail-subtitle")) {
+    $("sec-lessons-detail-subtitle").textContent = `Ano letivo ${metrics.selectedYear} · ${schoolClasses.length} turma(s)`;
+  }
+
+  if ($("sec-lessons-detail-body")) {
+    $("sec-lessons-detail-body").innerHTML = schoolClasses.map(cls => {
+      const st = metrics.classStatsMap.get(cls.id) || { count: 0, lastMs: null };
+      const days = st.lastMs ? getDaysSinceMs(st.lastMs) : null;
+      const etapaTurno = [cls.grade_level, cls.shift].filter(Boolean).join(" · ") || "—";
+      return `<tr>
+        <td><strong>${escapeHtml(cls.name || "—")}</strong></td>
+        <td>${escapeHtml(etapaTurno)}</td>
+        <td>${formatCount(st.count)}</td>
+        <td>${st.lastMs ? formatBrDateFromMs(st.lastMs) : "—"}</td>
+        <td>${typeof days === "number" ? `${days}d` : "—"}</td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="5">Nenhuma turma cadastrada para esta escola no ano selecionado.</td></tr>';
+  }
+}
+
+function renderSecretariaLessonsMonitor() {
+  if (!isSecretaria() || !$("sec-lessons-body")) return;
+  initSecretariaLessonMonitoringControls();
+
+  const metrics = buildSecretariaLessonMetrics();
+
+  if ($("sec-lessons-kpi-classes")) {
+    $("sec-lessons-kpi-classes").textContent = formatCount(metrics.totalClassesCount);
+  }
+  if ($("sec-lessons-kpi-schools")) {
+    $("sec-lessons-kpi-schools").textContent = `${formatCount(metrics.targetSchools.length)} escola(s)`;
+  }
+  if ($("sec-lessons-kpi-with")) {
+    $("sec-lessons-kpi-with").textContent = formatCount(metrics.schoolsWithRecordCount);
+  }
+  if ($("sec-lessons-kpi-without")) {
+    $("sec-lessons-kpi-without").textContent = formatCount(metrics.schoolsWithoutRecordCount);
+  }
+  if ($("sec-lessons-kpi-avg-days")) {
+    $("sec-lessons-kpi-avg-days").textContent = `${metrics.avgDaysWithoutLaunch}d`;
+  }
+
+  $("sec-lessons-body").innerHTML = metrics.schoolRows.map(row => {
+    const familyBadges = [
+      `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.72rem;font-weight:700;background:#0284c7;color:#ffffff;">DOCR</span>`
+    ];
+    if (!row.hasRecord) {
+      familyBadges.push(
+        `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.72rem;font-weight:700;background:#dc2626;color:#ffffff;margin-left:4px;">Sem Reg.</span>`
+      );
+    }
+
+    let daysBadge = `<span class="muted small">—</span>`;
+    if (typeof row.daysWithoutLaunch === "number") {
+      const isLate = row.daysWithoutLaunch >= 7;
+      const bg = isLate ? "#fef3c7" : "#dcfce7";
+      const fg = isLate ? "#b45309" : "#15803d";
+      daysBadge = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75rem;font-weight:700;background:${bg};color:${fg};">${row.daysWithoutLaunch}d</span>`;
+    }
+
+    return `<tr>
+      <td><strong>${escapeHtml(row.school.name)}</strong></td>
+      <td>${familyBadges.join("")}</td>
+      <td><span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:999px;font-size:0.78rem;font-weight:700;background:#2563eb;color:#ffffff;">${formatCount(row.classesCount)}</span></td>
+      <td><strong>${formatCount(row.recordCount)}</strong></td>
+      <td>${escapeHtml(row.lastDateLabel)}</td>
+      <td>${daysBadge}</td>
+      <td><button type="button" class="secondary small" data-view-school-classes="${escapeHtml(row.school.id)}">Ver Turmas</button></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="7">Nenhuma escola encontrada para o filtro selecionado.</td></tr>';
+
+  if ($("sec-lessons-summary")) {
+    $("sec-lessons-summary").textContent =
+      `${formatCount(metrics.schoolRows.length)} de ${formatCount(cachedSchools.length)} escola(s) — ${metrics.selectedYear}`;
+  }
+
+  renderSecretariaSchoolLessonDetail(metrics);
+}
+
+$("sec-lessons-year")?.addEventListener("change", () => {
+  if (!isSecretaria()) return;
+  renderSecretariaLessonsMonitor();
+});
+
+$("sec-lessons-school")?.addEventListener("change", () => {
+  if (!isSecretaria()) return;
+  activeLessonDetailSchoolId = null;
+  renderSecretariaLessonsMonitor();
+});
+
+$("sec-lessons-refresh")?.addEventListener("click", async () => {
+  if (!isSecretaria()) return;
+  await loadSecretariaLessonsMonitorData();
+  notice("Monitoramento de registros de aulas atualizado.");
+});
+
+$("sec-lessons-print")?.addEventListener("click", () => {
+  if (!isSecretaria()) return;
+  window.print();
+});
+
+$("sec-lessons-body")?.addEventListener("click", e => {
+  const btn = e.target.closest("[data-view-school-classes]");
+  if (!btn || !isSecretaria()) return;
+  activeLessonDetailSchoolId = btn.dataset.viewSchoolClasses;
+  renderSecretariaSchoolLessonDetail(buildSecretariaLessonMetrics());
+});
+
+$("sec-lessons-close-detail")?.addEventListener("click", () => {
+  activeLessonDetailSchoolId = null;
+  renderSecretariaSchoolLessonDetail(buildSecretariaLessonMetrics());
+});
+
 function renderReportSection() {
   const secView = $("secretaria-report-view");
   const stdView = $("standard-report-view");
@@ -838,7 +1166,7 @@ function renderReportSection() {
     secView?.classList.remove("hidden");
     stdView?.classList.add("hidden");
     if (subtitle) {
-      subtitle.textContent = "Números gerais consolidados de todas as escolas cadastradas na rede municipal.";
+      subtitle.textContent = "Números gerais e monitoramento de registros de aulas de todas as escolas cadastradas na rede municipal.";
     }
     if ($("secretaria-report-year")) {
       $("secretaria-report-year").textContent = `Ano de referência: ${new Date().getFullYear()}`;
@@ -851,6 +1179,8 @@ function renderReportSection() {
     if ($("sec-report-alunos-unicos")) $("sec-report-alunos-unicos").textContent = formatCount(metrics.alunosUnicos);
     if ($("sec-report-matriculas-especiais")) $("sec-report-matriculas-especiais").textContent = formatCount(metrics.matriculasEspeciais);
     if ($("sec-report-mudancas-matricula")) $("sec-report-mudancas-matricula").textContent = formatCount(metrics.mudancasMatricula);
+
+    renderSecretariaLessonsMonitor();
   } else {
     secView?.classList.add("hidden");
     stdView?.classList.remove("hidden");
@@ -966,16 +1296,34 @@ $("class-school")?.addEventListener("change", () => {
 
 async function loadAll() {
   try {
-    const [schools, students, classes, enrollments] = await Promise.all([
+    const queries = [
       fetchRows("schools"),
       fetchRows("students", "*, schools(name)"),
       fetchRows("classes", "*, schools(name)"),
       fetchRows("enrollments", "*, students(full_name, is_pcd), classes(name, aee_service, modality)")
-    ]);
+    ];
+    if (isSecretaria()) {
+      queries.push(
+        supabase
+          .from("lessons")
+          .select("id,class_id,lesson_date,subject,content,classes(id,name,school_id,school_year,grade_level,shift)")
+          .order("lesson_date", { ascending: false })
+          .limit(1000)
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return data || [];
+          })
+      );
+    }
+
+    const [schools, students, classes, enrollments, secretariaLessons = []] = await Promise.all(queries);
     cachedSchools = schools;
     cachedStudents = students;
     cachedClasses = classes;
     cachedEnrollments = enrollments;
+    if (isSecretaria()) {
+      cachedLessons = secretariaLessons;
+    }
 
     if (supabase && canAccessCensus()) {
       try {
