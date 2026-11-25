@@ -360,16 +360,26 @@ function isSchoolUnitProfile() {
   return ["gestor", "secretario_escolar"].includes(currentProfile?.role);
 }
 
+function hasBoundSchoolUnit() {
+  return Boolean(currentProfile?.school_id);
+}
+
 function canAccessCensus() {
-  return isSchoolUnitProfile();
+  return isSchoolUnitProfile() && hasBoundSchoolUnit();
 }
 
 function canManageCurriculumAndMonitors() {
   return isSecretaria() || currentProfile?.role === "gestor";
 }
 
+// Matrículas e Turmas: exclusivas de gestor e secretário escolar vinculados a uma unidade escolar
 function canManageClassesAndEnrollments() {
-  return ["secretaria", "gestor", "secretario_escolar"].includes(currentProfile?.role);
+  return isSchoolUnitProfile() && hasBoundSchoolUnit();
+}
+
+// Diário de classe: exclusivo de gestor, secretário escolar e professor vinculados a uma unidade escolar
+function canAccessDiary() {
+  return ["gestor", "secretario_escolar", "professor"].includes(currentProfile?.role) && hasBoundSchoolUnit();
 }
 
 function getEffectiveSchoolId() {
@@ -474,6 +484,16 @@ function showApp(profile, user) {
 }
 
 function go(page) {
+  if ((page === "matriculas" || page === "turmas") && !canManageClassesAndEnrollments()) {
+    notice("Matrículas e Turmas estão disponíveis apenas para Gestor escolar e Secretário escolar vinculados a uma unidade escolar.", true);
+    page = "inicio";
+  }
+
+  if (page === "diario" && !canAccessDiary()) {
+    notice("O Diário de classe está disponível apenas para Gestor escolar, Secretário escolar e Professor vinculados a uma unidade escolar.", true);
+    page = "inicio";
+  }
+
   if (page === "censo" && !canAccessCensus()) {
     notice("O Censo Escolar é gerenciado diretamente por Secretário escolar e Gestor escolar na unidade vinculada.", true);
     page = "inicio";
@@ -494,7 +514,7 @@ function go(page) {
     relatorios: "Relatórios",
     usuarios: "Cadastro de usuários"
   })[page] || "Gestão Escolar";
-  if (page === "diario") loadLessons();
+  if (page === "diario" && canAccessDiary()) loadLessons();
   if (page === "usuarios") loadProfiles();
   if (page === "matriz") {
     fillMonitorSubjectSelect();
@@ -773,13 +793,15 @@ function applySchoolScope() {
 
   renderSchools(scopedSchools);
   renderStudents(scopedStudents);
-  renderClasses(scopedClasses);
-  renderEnrollments(scopedEnrollments);
+  if (canManageClassesAndEnrollments()) {
+    renderClasses(scopedClasses);
+    renderEnrollments(scopedEnrollments);
+  }
   fillSelects(scopedStudents, scopedClasses);
   renderUsers();
   renderMonitors();
   if (canAccessCensus()) renderCensus();
-  loadLessons();
+  if (canAccessDiary()) loadLessons();
 }
 
 async function fetchRows(table, select = "*") {
@@ -806,7 +828,9 @@ async function loadProfiles() {
     cachedProfiles = data || [];
     renderUsers();
     fillTeacherSelect();
-    renderClasses(getScopedClasses());
+    if (canManageClassesAndEnrollments()) {
+      renderClasses(getScopedClasses());
+    }
   } catch (e) {
     console.warn("Não foi possível carregar perfis:", formatSupabaseError(e), e);
     fillSelect("class-teacher", [], x => x.full_name, "Não definido");
@@ -2262,14 +2286,14 @@ insertForm(
 $("class-form")?.addEventListener("submit", async e => {
   e.preventDefault();
   if (!canManageClassesAndEnrollments()) {
-    notice("Seu perfil não tem permissão para criar turmas.", true);
+    notice("Apenas Gestor escolar e Secretário escolar vinculados a uma unidade podem criar turmas.", true);
     return;
   }
 
   const raw = formObject(e.target);
-  const targetSchoolId = isSecretaria() ? raw.school_id : getEffectiveSchoolId();
+  const targetSchoolId = getEffectiveSchoolId();
   if (!targetSchoolId) {
-    notice("Selecione ou vincule uma unidade escolar antes de criar a turma.", true);
+    notice("Seu perfil precisa estar vinculado a uma unidade escolar para criar turmas.", true);
     return;
   }
 
@@ -2330,7 +2354,7 @@ $("class-form")?.addEventListener("submit", async e => {
 $("enrollment-form")?.addEventListener("submit", async e => {
   e.preventDefault();
   if (!canManageClassesAndEnrollments()) {
-    notice("Seu perfil não tem permissão para enturmar alunos.", true);
+    notice("Apenas Gestor escolar e Secretário escolar vinculados a uma unidade podem enturmar alunos.", true);
     return;
   }
 
@@ -2400,13 +2424,28 @@ $("enrollment-form")?.addEventListener("submit", async e => {
   }
 });
 
-insertForm("lesson-form", "lessons", x => ({
-  ...x,
-  teacher_id: currentProfile?.id
-}));
+insertForm(
+  "lesson-form",
+  "lessons",
+  x => ({
+    ...x,
+    teacher_id: currentProfile?.id
+  }),
+  null,
+  raw => {
+    if (!canAccessDiary()) {
+      return { ok: false, message: "Apenas perfis vinculados à unidade escolar podem registrar aulas no diário." };
+    }
+    const allowedClasses = new Set(getScopedClasses().map(c => c.id));
+    if (!allowedClasses.has(raw.class_id)) {
+      return { ok: false, message: "Selecione uma turma da sua unidade escolar." };
+    }
+    return { ok: true };
+  }
+);
 
 async function loadLessons() {
-  if (!$("lessons-body")) return;
+  if (!$("lessons-body") || !canAccessDiary()) return;
   try {
     const { data, error } = await supabase
       .from("lessons")
@@ -2415,7 +2454,7 @@ async function loadLessons() {
       .limit(50);
     if (error) throw error;
     const effectiveId = getEffectiveSchoolId();
-    const rows = (data || []).filter(l => !effectiveId || l.classes?.school_id === effectiveId);
+    const rows = (data || []).filter(l => effectiveId && l.classes?.school_id === effectiveId);
     $("lessons-body").innerHTML = rows.map(l =>
       `<tr><td>${escapeHtml(l.lesson_date)}</td><td>${escapeHtml(l.classes?.name || "—")}</td><td>${escapeHtml(l.subject)}</td><td>${escapeHtml(l.content)}</td></tr>`
     ).join("") || '<tr><td colspan="4">Nenhuma aula registrada.</td></tr>';
@@ -2425,6 +2464,10 @@ async function loadLessons() {
 }
 
 $("load-attendance")?.addEventListener("click", async () => {
+  if (!canAccessDiary()) {
+    notice("Apenas perfis vinculados à unidade escolar podem acessar o diário.", true);
+    return;
+  }
   const classId = $("attendance-class")?.value;
   const date = $("attendance-date")?.value;
   if (!classId || !date) {
@@ -2460,6 +2503,7 @@ $("load-attendance")?.addEventListener("click", async () => {
 });
 
 $("save-attendance")?.addEventListener("click", async () => {
+  if (!canAccessDiary()) return;
   const classId = $("attendance-class")?.value;
   const date = $("attendance-date")?.value;
   if (!classId || !date || !attendanceRows.length) return;
