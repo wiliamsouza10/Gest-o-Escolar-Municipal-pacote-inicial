@@ -605,15 +605,68 @@
       </section>
 
       <section id="page-relatorios" class="page hidden">
-        <div class="panel"><div class="panel-head"><div><h3>Relatórios e indicadores</h3><p class="muted">Resumo dos registros aos quais seu perfil tem acesso.</p></div></div>
-          <div class="report-grid">
-            <div class="report"><span>Alunos cadastrados</span><strong id="report-students">—</strong></div>
-            <div class="report"><span>Matrículas ativas</span><strong id="report-enrollments">—</strong></div>
-            <div class="report"><span>Enturmados no AEE</span><strong id="report-aee">—</strong></div>
-            <div class="report"><span>Declarados PcD</span><strong id="report-pcd">—</strong></div>
-            <div class="report"><span>Turmas</span><strong id="report-classes">—</strong></div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Relatórios e indicadores</h3>
+              <p class="muted" id="report-subtitle">Resumo dos registros aos quais seu perfil tem acesso.</p>
+            </div>
           </div>
-          <p class="muted small">Os indicadores são calculados a partir dos registros disponíveis para seu perfil. Para relatórios oficiais, valide os dados com a escrituração escolar.</p>
+
+          <div id="secretaria-report-view" class="hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:12px 14px;border-radius:10px;background:#f4f7f9;border:1px solid #dde5ec;">
+              <div>
+                <strong>Números gerais — Rede Municipal</strong>
+                <p class="muted small" style="margin:2px 0 0;">Consolidado geral de todas as escolas cadastradas na rede municipal.</p>
+              </div>
+              <span class="muted small" id="secretaria-report-year">Ano de referência: —</span>
+            </div>
+
+            <div class="report-grid">
+              <div class="report" style="background:#eef2fb;border-color:#d5dff5;">
+                <span>Matriculados</span>
+                <strong id="sec-report-matriculados">—</strong>
+                <small class="muted small">Número geral de alunos das escolas</small>
+              </div>
+              <div class="report" style="background:#f9ecec;border-color:#f0d4d4;">
+                <span>Total de escolas</span>
+                <strong id="sec-report-escolas">—</strong>
+                <small class="muted small">Escolas cadastradas na rede</small>
+              </div>
+              <div class="report" style="background:#eaf6ee;border-color:#cce8d5;">
+                <span>Profissionais da educação</span>
+                <strong id="sec-report-profissionais">—</strong>
+                <small class="muted small">Cadastrados nas escolas da rede</small>
+              </div>
+            </div>
+
+            <div class="report-grid" style="margin-top:12px;">
+              <div class="report" style="background:#e8f4fc;border-color:#cde5f7;">
+                <span>Alunos únicos</span>
+                <strong id="sec-report-alunos-unicos">—</strong>
+              </div>
+              <div class="report" style="background:#fbf5e4;border-color:#efe0b8;">
+                <span>Matrículas especiais</span>
+                <strong id="sec-report-matriculas-especiais">—</strong>
+                <small class="muted small">Enturmados em turmas de AEE</small>
+              </div>
+              <div class="report" style="background:#edf7ee;border-color:#d1ead3;">
+                <span>Mudanças na matrícula</span>
+                <strong id="sec-report-mudancas-matricula">—</strong>
+              </div>
+            </div>
+          </div>
+
+          <div id="standard-report-view">
+            <div class="report-grid">
+              <div class="report"><span>Alunos cadastrados</span><strong id="report-students">—</strong></div>
+              <div class="report"><span>Matrículas ativas</span><strong id="report-enrollments">—</strong></div>
+              <div class="report"><span>Enturmados no AEE</span><strong id="report-aee">—</strong></div>
+              <div class="report"><span>Declarados PcD</span><strong id="report-pcd">—</strong></div>
+              <div class="report"><span>Turmas</span><strong id="report-classes">—</strong></div>
+            </div>
+            <p class="muted small">Os indicadores são calculados a partir dos registros disponíveis para seu perfil. Para relatórios oficiais, valide os dados com a escrituração escolar.</p>
+          </div>
         </div>
       </section>
 
