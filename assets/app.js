@@ -45,19 +45,32 @@ const roleNames = {
   monitor_complementar: "Monitor de atividade complementar"
 };
 
-function generateFourDigitClassCode() {
+function generateFourDigitCode(existingList, fieldName) {
   const existingCodes = new Set(
-    cachedClasses
-      .map(c => String(c.class_code || "").trim())
+    existingList
+      .map(item => String(item?.[fieldName] || "").trim())
       .filter(Boolean)
   );
 
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 200; i++) {
     const code = String(Math.floor(1000 + Math.random() * 9000));
     if (!existingCodes.has(code)) return code;
   }
 
+  for (let n = 1000; n <= 9999; n++) {
+    const candidate = String(n);
+    if (!existingCodes.has(candidate)) return candidate;
+  }
+
   return String(1000 + (Date.now() % 9000)).padStart(4, "0");
+}
+
+function generateFourDigitSchoolCode() {
+  return generateFourDigitCode(cachedSchools, "school_code");
+}
+
+function generateFourDigitClassCode() {
+  return generateFourDigitCode(cachedClasses, "class_code");
 }
 
 function normalizeCpf(value) {
@@ -117,6 +130,39 @@ function getActiveSchool() {
   const effectiveId = getEffectiveSchoolId();
   if (!effectiveId) return null;
   return cachedSchools.find(s => s.id === effectiveId) || null;
+}
+
+function updateHomeSchoolCard() {
+  const activeSchool = getActiveSchool();
+  const scopedSchools = getScopedSchools();
+  const targetSchool = activeSchool || (scopedSchools.length === 1 ? scopedSchools[0] : null);
+
+  if ($("home-school-id")) {
+    $("home-school-id").textContent = targetSchool?.school_code || (isSecretaria() ? "Rede" : "—");
+  }
+  if ($("home-school-inep")) {
+    $("home-school-inep").textContent = targetSchool?.inep_code || (isSecretaria() ? "Todas" : "—");
+  }
+  if ($("home-school-curriculum")) {
+    if (targetSchool) {
+      $("home-school-curriculum").textContent = targetSchool.curriculum_offer || "Comum";
+    } else if (isSecretaria()) {
+      const offers = Array.from(new Set(scopedSchools.map(s => s.curriculum_offer || "Comum")));
+      $("home-school-curriculum").textContent = offers.length === 1 ? offers[0] : "Comum / Rede";
+    } else {
+      $("home-school-curriculum").textContent = "—";
+    }
+  }
+
+  if ($("inicio-school-subtitle")) {
+    if (targetSchool) {
+      $("inicio-school-subtitle").textContent = `Unidade ativa: ${targetSchool.name} · ID ${targetSchool.school_code || "—"} · INEP ${targetSchool.inep_code || "Não informado"}.`;
+    } else if (isSecretaria()) {
+      $("inicio-school-subtitle").textContent = "Visualização geral de toda a rede municipal. Selecione uma escola na barra superior para detalhar.";
+    } else {
+      $("inicio-school-subtitle").textContent = "Acompanhe as informações da sua unidade escolar.";
+    }
+  }
 }
 
 function notice(message, bad = false) {
@@ -287,9 +333,12 @@ if (supabase) {
   });
 }
 
-// --- DIRECIONAMENTO POR NOME DA ESCOLA OU CÓDIGO INEP (SECRETARIA) ---
+// --- DIRECIONAMENTO POR NOME DA ESCOLA, ID OU CÓDIGO INEP (SECRETARIA) ---
 function formatSchoolOption(school) {
-  return school.inep_code ? `${school.name} (INEP: ${school.inep_code})` : school.name;
+  const idPart = school.school_code ? `ID ${school.school_code}` : "";
+  const inepPart = school.inep_code ? `INEP ${school.inep_code}` : "";
+  const meta = [idPart, inepPart].filter(Boolean).join(" · ");
+  return meta ? `${school.name} (${meta})` : school.name;
 }
 
 function updateSecretariaSchoolDatalist() {
@@ -307,12 +356,14 @@ function findSchoolByNameOrInep(term) {
   let match = cachedSchools.find(s =>
     formatSchoolOption(s).toLowerCase() === clean ||
     String(s.name || "").trim().toLowerCase() === clean ||
+    String(s.school_code || "").trim().toLowerCase() === clean ||
     String(s.inep_code || "").trim().toLowerCase() === clean
   );
   if (match) return match;
 
   const partials = cachedSchools.filter(s =>
     String(s.name || "").toLowerCase().includes(clean) ||
+    String(s.school_code || "").toLowerCase().includes(clean) ||
     String(s.inep_code || "").toLowerCase().includes(clean)
   );
   return partials.length === 1 ? partials[0] : null;
@@ -329,7 +380,7 @@ function setActiveSchool(school, redirectToPanel = true) {
   applySchoolScope();
 
   if (school) {
-    notice(`Direcionado para a unidade: ${school.name}${school.inep_code ? ` (INEP ${school.inep_code})` : ""}.`);
+    notice(`Direcionado para a unidade: ${school.name}${school.school_code ? ` · ID ${school.school_code}` : ""}${school.inep_code ? ` · INEP ${school.inep_code}` : ""}.`);
     if (redirectToPanel) go("inicio");
   } else {
     notice("Exibindo dados gerais de toda a rede municipal.");
@@ -347,7 +398,7 @@ $("secretaria-school-search")?.addEventListener("change", e => {
   if (school) {
     setActiveSchool(school, true);
   } else {
-    notice("Nenhuma escola única encontrada com esse nome ou código INEP. Selecione uma opção da lista.", true);
+    notice("Nenhuma escola única encontrada com esse nome, ID ou código INEP. Selecione uma opção da lista.", true);
   }
 });
 
@@ -414,6 +465,7 @@ function getScopedTeachers(schoolIdFilter = "") {
 
 function applySchoolScope() {
   updateRoleLabel();
+  updateHomeSchoolCard();
   const scopedSchools = getScopedSchools();
   const scopedStudents = getScopedStudents();
   const scopedClasses = getScopedClasses();
@@ -551,7 +603,7 @@ function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getSc
   }
 }
 
-// --- ESCOLAS (COM GESTOR E EXCLUSÃO PELA SECRETARIA) ---
+// --- ESCOLAS (COM ID 4 DÍGITOS, GESTOR, CURRÍCULO E EXCLUSÃO PELA SECRETARIA) ---
 function renderSchools(visibleSchools = getScopedSchools()) {
   if (!$("schools-body")) return;
 
@@ -561,14 +613,16 @@ function renderSchools(visibleSchools = getScopedSchools()) {
       ? `<button type="button" class="secondary small" data-delete-school="${escapeHtml(s.id)}" data-school-name="${escapeHtml(s.name)}">Excluir</button>`
       : `<span class="muted small">—</span>`;
     return `<tr data-select-school="${escapeHtml(s.id)}" style="${isSecretaria() ? "cursor:pointer;" : ""}${isSelected ? "background:#eef5ff;font-weight:600;" : ""}">
+      <td>${escapeHtml(s.school_code || "—")}</td>
       <td>${escapeHtml(s.name)}${isSelected ? " (Selecionada)" : ""}</td>
       <td>${escapeHtml(s.manager_name || "—")}</td>
       <td>${escapeHtml(s.inep_code || "—")}</td>
+      <td>${escapeHtml(s.curriculum_offer || "Comum")}</td>
       <td>${escapeHtml(s.address || "—")}</td>
       <td>${escapeHtml(s.phone || "—")}</td>
       <td>${deleteBtn}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="6">Nenhuma escola vinculada.</td></tr>';
+  }).join("") || '<tr><td colspan="8">Nenhuma escola vinculada.</td></tr>';
 }
 
 $("schools-body")?.addEventListener("click", async e => {
@@ -1125,6 +1179,7 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
       const { data, error } = await supabase.from(table).insert(obj).select().single();
       if (error) throw error;
       form.reset();
+      if (form.elements["curriculum_offer"]) form.elements["curriculum_offer"].value = "Comum";
       document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
       if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
       const effectiveId = getEffectiveSchoolId();
@@ -1134,13 +1189,21 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
         if ($("monitor-school")) $("monitor-school").value = effectiveId;
         if ($("census-school")) $("census-school").value = effectiveId;
       }
-      notice("Registro salvo com sucesso.");
+      notice(
+        table === "schools" && data?.school_code
+          ? `Unidade escolar cadastrada com sucesso! ID Escola: ${data.school_code}.`
+          : "Registro salvo com sucesso."
+      );
       await loadAll();
       if (onSuccess && data) onSuccess(data);
     } catch (err) {
       console.error(err);
       if (err?.code === "23505" && table === "students") {
         notice("Já existe um aluno cadastrado com este CPF.", true);
+        return;
+      }
+      if (err?.code === "23505" && table === "schools") {
+        notice("Conflito ao gerar o ID escolar de 4 dígitos. Tente salvar novamente.", true);
         return;
       }
       if (err?.code === "22023") {
@@ -1153,9 +1216,11 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
 }
 
 insertForm("school-form", "schools", x => ({
+  school_code: generateFourDigitSchoolCode(),
   name: String(x.name || "").trim(),
   manager_name: String(x.manager_name || "").trim() || null,
   inep_code: String(x.inep_code || "").trim() || null,
+  curriculum_offer: String(x.curriculum_offer || "Comum").trim() || "Comum",
   address: String(x.address || "").trim() || null,
   phone: String(x.phone || "").trim() || null
 }), (createdSchool) => {
