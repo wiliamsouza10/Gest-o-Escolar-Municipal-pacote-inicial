@@ -98,7 +98,7 @@
       </section>
 
       <section id="page-escolas" class="page hidden">
-        <div class="panel"><div class="panel-head"><div><h3>Unidades escolares</h3><p class="muted">Cadastro das escolas da rede municipal, gestor responsável, código INEP e oferta curricular.</p></div></div>
+        <div class="panel"><div class="panel-head"><div><h3>Unidades escolares</h3><p class="muted">Cadastro das escolas da rede municipal, gestor responsável, código INEP, oferta curricular e blocos do Censo Escolar.</p></div></div>
           <form id="school-form" class="form-grid">
             <label>Nome da escola<input name="name" required maxlength="160" placeholder="Ex.: E.M. Monteiro Lobato"></label>
             <label>Gestor da unidade<input name="manager_name" maxlength="160" placeholder="Nome do diretor(a) / gestor(a)"></label>
@@ -112,6 +112,27 @@
             </label>
             <label>Endereço<input name="address" maxlength="240" placeholder="Rua, número, bairro"></label>
             <label>Telefone<input name="phone" maxlength="30" placeholder="(00) 0000-0000"></label>
+
+            <div style="grid-column: 1 / -1;margin-top:8px;padding:14px;border-radius:10px;border:1px solid #d5e2d0;background:#f8fbf7;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div>
+                  <strong>Blocos temáticos do Censo Escolar para esta escola</strong>
+                  <p class="muted small" style="margin:2px 0 0;">Preencha todos os blocos desejados antes de cadastrar a unidade escolar.</p>
+                </div>
+                <button type="button" class="secondary small" id="toggle-school-census-panel">Abrir / Ocultar blocos do Censo</button>
+              </div>
+              <div id="school-census-panel" class="hidden" style="margin-top:12px;">
+                <div id="school-census-modules-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;"></div>
+                <div id="school-census-module-editor" class="hidden" style="margin-top:14px;padding:14px;border-radius:8px;background:#ffffff;border:1px solid #c9dfbe;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+                    <strong id="school-census-editor-title">Bloco</strong>
+                    <button type="button" class="secondary small" id="school-census-apply-module">Aplicar bloco ao cadastro da escola</button>
+                  </div>
+                  <div id="school-census-module-fields" class="form-grid"></div>
+                </div>
+              </div>
+            </div>
+
             <button class="primary" type="submit">Cadastrar escola</button>
           </form>
           <div class="table-wrap">
@@ -501,7 +522,7 @@
           <div class="panel-head">
             <div>
               <h3>CENSO ESCOLAR</h3>
-              <p class="muted">Selecione uma unidade escolar e clique em qualquer bloco temático para preencher ou conferir os dados do Censo Escolar.</p>
+              <p class="muted">Preencha e edite os blocos temáticos do Censo Escolar para a unidade escolar vinculada ou selecionada.</p>
             </div>
           </div>
 
@@ -543,9 +564,9 @@
             <button class="primary" type="submit">Salvar mapeamento do Censo</button>
           </form>
 
-          <div class="panel-sub" style="margin-top: 20px;">
+          <div id="census-school-blocks-section" class="panel-sub hidden" style="margin-top: 20px;">
             <h4>Blocos temáticos do Censo Escolar</h4>
-            <p class="muted">Clique em um bloco para editar os campos específicos da unidade e ano selecionados[cite: 4].</p>
+            <p class="muted" id="census-blocks-hint">Clique em um bloco para editar ou atualizar as informações da unidade escolar.</p>
             <div id="census-modules-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:14px;"></div>
 
             <div id="census-module-editor" class="hidden" style="margin-top:18px;padding:16px;border-radius:12px;border:1px solid #d5e2d0;background:#f8fbf7;">
