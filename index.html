@@ -98,30 +98,23 @@
       </section>
 
       <section id="page-escolas" class="page hidden">
-        <div class="panel"><div class="panel-head"><div><h3>Unidades escolares</h3><p class="muted">Cadastro das escolas da rede municipal, gestor responsável, código INEP, oferta curricular e blocos do Censo Escolar.</p></div></div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Unidades escolares</h3>
+              <p class="muted">Cadastre a unidade escolar preenchendo os blocos temáticos do Censo Escolar (começando por Identificação Escola).</p>
+            </div>
+          </div>
           <form id="school-form" class="form-grid">
-            <label>Nome da escola<input name="name" required maxlength="160" placeholder="Ex.: E.M. Monteiro Lobato"></label>
-            <label>Gestor da unidade<input name="manager_name" maxlength="160" placeholder="Nome do diretor(a) / gestor(a)"></label>
-            <label>Código INEP<input name="inep_code" maxlength="20" placeholder="Ex.: 29235146"></label>
-            <label>Currículo (Oferta curricular)
-              <select name="curriculum_offer" required>
-                <option value="Comum" selected>Comum</option>
-                <option value="Diversificado">Diversificado</option>
-                <option value="Comum e Diversificado">Comum e Diversificado</option>
-              </select>
-            </label>
-            <label>Endereço<input name="address" maxlength="240" placeholder="Rua, número, bairro"></label>
-            <label>Telefone<input name="phone" maxlength="30" placeholder="(00) 0000-0000"></label>
-
-            <div style="grid-column: 1 / -1;margin-top:8px;padding:14px;border-radius:10px;border:1px solid #d5e2d0;background:#f8fbf7;">
+            <div style="grid-column: 1 / -1;padding:14px;border-radius:10px;border:1px solid #d5e2d0;background:#f8fbf7;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
                 <div>
-                  <strong>Blocos temáticos do Censo Escolar para esta escola</strong>
-                  <p class="muted small" style="margin:2px 0 0;">Preencha todos os blocos desejados antes de cadastrar a unidade escolar.</p>
+                  <strong>Blocos temáticos do Censo Escolar</strong>
+                  <p class="muted small" style="margin:2px 0 0;">Preencha os blocos desejados para cadastrar a unidade escolar.</p>
                 </div>
                 <button type="button" class="secondary small" id="toggle-school-census-panel">Abrir / Ocultar blocos do Censo</button>
               </div>
-              <div id="school-census-panel" class="hidden" style="margin-top:12px;">
+              <div id="school-census-panel" style="margin-top:12px;">
                 <div id="school-census-modules-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;"></div>
                 <div id="school-census-module-editor" class="hidden" style="margin-top:14px;padding:14px;border-radius:8px;background:#ffffff;border:1px solid #c9dfbe;">
                   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
