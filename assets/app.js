@@ -23,7 +23,7 @@ const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
 const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v2";
 const SCHOOL_DRAFT_CENSUS_KEY = "ge_rascunho_censo_escola_v1";
 
-// 21 blocos exibidos no cadastro da unidade escolar e na seção CENSO ESCOLAR
+// 21 blocos exibidos no cadastro da unidade escolar e na seção CENSO ESCOLAR (gestor e secretário escolar)
 const CENSUS_MODULES = [
   {
     key: "identificacao_escola",
@@ -342,6 +342,10 @@ function isSchoolUnitProfile() {
   return ["gestor", "secretario_escolar"].includes(currentProfile?.role);
 }
 
+function canAccessCensus() {
+  return isSchoolUnitProfile();
+}
+
 function canManageCurriculumAndMonitors() {
   return isSecretaria() || currentProfile?.role === "gestor";
 }
@@ -446,6 +450,11 @@ function showApp(profile, user) {
 }
 
 function go(page) {
+  if (page === "censo" && !canAccessCensus()) {
+    notice("O Censo Escolar é gerenciado diretamente por Secretário escolar e Gestor escolar na unidade vinculada.", true);
+    page = "inicio";
+  }
+
   document.querySelectorAll(".page").forEach(p => p.classList.add("hidden"));
   $("page-" + page)?.classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.page === page));
@@ -468,7 +477,7 @@ function go(page) {
     renderCurriculum();
     renderMonitors();
   }
-  if (page === "censo") renderCensus();
+  if (page === "censo" && canAccessCensus()) renderCensus();
   if (page === "escolas") renderSchoolFormCensusGrid();
 }
 
@@ -741,7 +750,7 @@ function applySchoolScope() {
   fillSelects(scopedStudents, scopedClasses);
   renderUsers();
   renderMonitors();
-  renderCensus();
+  if (canAccessCensus()) renderCensus();
   loadLessons();
 }
 
@@ -1457,14 +1466,10 @@ $("monitors-body")?.addEventListener("click", e => {
   notice("Monitor removido.");
 });
 
-// --- MAPEAMENTO DO CENSO ESCOLAR (21 BLOCOS PARA SECRETÁRIO ESCOLAR, GESTOR E ESCOLA SELECIONADA) ---
+// --- MAPEAMENTO DO CENSO ESCOLAR (EXCLUSIVO PARA SECRETÁRIO ESCOLAR E GESTOR ESCOLAR VINCULADOS) ---
 function getSelectedCensusSchoolId() {
-  if (isSchoolUnitProfile()) {
-    return currentProfile?.school_id || "";
-  }
-  const selectVal = $("census-school")?.value;
-  if (selectVal) return selectVal;
-  return isSecretaria() ? selectedSchoolId : "";
+  if (!canAccessCensus()) return "";
+  return currentProfile?.school_id || "";
 }
 
 function getSelectedCensusYear() {
@@ -1498,6 +1503,13 @@ function renderCensusModulesGrid() {
   const grid = $("census-modules-grid");
   if (!blocksSection || !grid) return;
 
+  if (!canAccessCensus()) {
+    blocksSection.classList.add("hidden");
+    activeCensusModuleKey = null;
+    $("census-module-editor")?.classList.add("hidden");
+    return;
+  }
+
   const schoolId = getSelectedCensusSchoolId();
   const school = cachedSchools.find(s => s.id === schoolId);
 
@@ -1510,7 +1522,7 @@ function renderCensusModulesGrid() {
 
   blocksSection.classList.remove("hidden");
   if ($("census-blocks-hint")) {
-    $("census-blocks-hint").textContent = `Unidade: ${school.name}. Clique em qualquer bloco abaixo para preencher ou editar os dados do Censo Escolar.`;
+    $("census-blocks-hint").textContent = `Unidade vinculada: ${school.name}. Clique em qualquer bloco abaixo para preencher ou editar os dados do Censo Escolar.`;
   }
 
   const year = getSelectedCensusYear();
@@ -1534,6 +1546,11 @@ function renderCensusModulesGrid() {
 }
 
 function openCensusModuleEditor(modKey) {
+  if (!canAccessCensus()) {
+    notice("Apenas Secretário escolar e Gestor escolar podem editar os blocos do Censo.", true);
+    return;
+  }
+
   const mod = CENSUS_MODULES.find(m => m.key === modKey);
   const editor = $("census-module-editor");
   const fieldsContainer = $("census-module-fields");
@@ -1543,7 +1560,7 @@ function openCensusModuleEditor(modKey) {
   const year = getSelectedCensusYear();
   const school = cachedSchools.find(s => s.id === schoolId);
   if (!school) {
-    notice("Nenhuma unidade escolar específica selecionada para editar os blocos do Censo.", true);
+    notice("Seu perfil não possui uma unidade escolar vinculada para editar os blocos do Censo.", true);
     return;
   }
 
@@ -1582,8 +1599,8 @@ function openCensusModuleEditor(modKey) {
 }
 
 function renderCensus() {
-  if (!$("census-body")) return;
-  const effectiveId = getEffectiveSchoolId();
+  if (!$("census-body") || !canAccessCensus()) return;
+  const effectiveId = getSelectedCensusSchoolId();
   const scopedSchools = getScopedSchools();
   const scopedStudents = getScopedStudents();
   const scopedEnrollments = getScopedEnrollments();
@@ -1596,7 +1613,12 @@ function renderCensus() {
 
   const visibleCensus = effectiveId
     ? cachedCensus.filter(c => c.school_id === effectiveId)
-    : cachedCensus;
+    : [];
+
+  if ($("census-school")) {
+    $("census-school").value = effectiveId;
+    $("census-school").disabled = true;
+  }
 
   if ($("censo-schools-count")) $("censo-schools-count").textContent = scopedSchools.length;
   if ($("censo-students-count")) $("censo-students-count").textContent = validStudents.length;
@@ -1607,9 +1629,6 @@ function renderCensus() {
   $("census-body").innerHTML = visibleCensus.map(row => {
     const school = cachedSchools.find(s => s.id === row.school_id);
     const filledCount = countFilledCensusModules(row);
-    const delBtn = isSecretaria()
-      ? `<button type="button" class="secondary small" data-delete-census="${escapeHtml(row.id)}">Excluir</button>`
-      : `<span class="muted small">—</span>`;
     return `<tr>
       <td>${escapeHtml(school?.name || row.school_name || "—")}</td>
       <td>${escapeHtml(school?.inep_code || "Sem INEP")}</td>
@@ -1618,9 +1637,9 @@ function renderCensus() {
       <td>${escapeHtml(row.offered_stages)}</td>
       <td>${filledCount} / ${CENSUS_MODULES.length}</td>
       <td>${escapeHtml(row.validation_status)}</td>
-      <td>${delBtn}</td>
+      <td><span class="muted small">Unidade vinculada</span></td>
     </tr>`;
-  }).join("") || '<tr><td colspan="8">Nenhum mapeamento do Censo Escolar registrado ainda.</td></tr>';
+  }).join("") || '<tr><td colspan="8">Nenhum mapeamento do Censo Escolar registrado para sua unidade ainda.</td></tr>';
 }
 
 $("census-modules-grid")?.addEventListener("click", e => {
@@ -1635,21 +1654,8 @@ $("census-close-editor")?.addEventListener("click", () => {
   renderCensusModulesGrid();
 });
 
-$("census-school")?.addEventListener("change", () => {
-  const schoolId = getSelectedCensusSchoolId();
-  const year = getSelectedCensusYear();
-  const existing = getCurrentCensusEntry(schoolId, year);
-  if (existing) {
-    if ($("census-operating-status")) $("census-operating-status").value = existing.operating_status || "Em atividade";
-    if ($("census-offered-stages")) $("census-offered-stages").value = existing.offered_stages || "";
-    if ($("census-infrastructure-notes")) $("census-infrastructure-notes").value = existing.infrastructure_notes || "";
-    if ($("census-validation-status")) $("census-validation-status").value = existing.validation_status || "Pendente";
-  }
-  renderCensusModulesGrid();
-  if (activeCensusModuleKey) openCensusModuleEditor(activeCensusModuleKey);
-});
-
 $("census-year-input")?.addEventListener("change", () => {
+  if (!canAccessCensus()) return;
   renderCensusModulesGrid();
   if (activeCensusModuleKey) openCensusModuleEditor(activeCensusModuleKey);
 });
@@ -1677,12 +1683,16 @@ async function persistCensusEntry(entry) {
 }
 
 $("census-save-module")?.addEventListener("click", async () => {
+  if (!canAccessCensus()) {
+    notice("Apenas Secretário escolar e Gestor escolar podem salvar blocos do Censo.", true);
+    return;
+  }
   if (!activeCensusModuleKey) return;
   const schoolId = getSelectedCensusSchoolId();
   const year = getSelectedCensusYear();
   const school = cachedSchools.find(s => s.id === schoolId);
   if (!school) {
-    notice("Selecione uma unidade escolar válida.", true);
+    notice("Seu perfil não possui uma unidade escolar vinculada.", true);
     return;
   }
 
@@ -1715,11 +1725,15 @@ $("census-save-module")?.addEventListener("click", async () => {
 
 $("census-form")?.addEventListener("submit", async e => {
   e.preventDefault();
+  if (!canAccessCensus()) {
+    notice("Apenas Secretário escolar e Gestor escolar podem salvar o mapeamento do Censo.", true);
+    return;
+  }
   const data = formObject(e.target);
-  const targetSchoolId = isSecretaria() ? data.school_id : getEffectiveSchoolId();
+  const targetSchoolId = getSelectedCensusSchoolId();
   const school = cachedSchools.find(s => s.id === targetSchoolId);
   if (!school) {
-    notice("Selecione uma unidade escolar válida para o Censo.", true);
+    notice("Seu perfil não possui uma unidade escolar vinculada para o Censo.", true);
     return;
   }
   const year = Number(data.census_year) || new Date().getFullYear();
@@ -1740,20 +1754,6 @@ $("census-form")?.addEventListener("submit", async e => {
   await persistCensusEntry(entry);
   renderCensus();
   notice(`Mapeamento do Censo salvo para ${school.name}.`);
-});
-
-$("census-body")?.addEventListener("click", e => {
-  const btn = e.target.closest("[data-delete-census]");
-  if (!btn) return;
-  if (!isSecretaria()) {
-    notice("Apenas o perfil Secretaria de Educação pode excluir registros do Censo.", true);
-    return;
-  }
-  const id = btn.dataset.deleteCensus;
-  cachedCensus = cachedCensus.filter(x => x.id !== id);
-  saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
-  renderCensus();
-  notice("Registro do Censo removido.");
 });
 
 async function callUserFunction(payload) {
