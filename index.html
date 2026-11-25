@@ -32,9 +32,9 @@
         <button class="nav-item active" data-page="inicio">▦ <span>Painel inicial</span></button>
         <button class="nav-item" data-page="escolas" data-roles="secretaria">⌂ <span>Escolas</span></button>
         <button class="nav-item" data-page="alunos" data-roles="secretaria,gestor,secretario_escolar">♙ <span>Alunos</span></button>
-        <button class="nav-item" data-page="matriculas" data-roles="secretaria,gestor,secretario_escolar">▤ <span>Matrículas</span></button>
-        <button class="nav-item" data-page="turmas" data-roles="secretaria,gestor,secretario_escolar">▥ <span>Turmas</span></button>
-        <button class="nav-item" data-page="diario" data-roles="secretaria,gestor,professor">▧ <span>Diário de classe</span></button>
+        <button class="nav-item" data-page="matriculas" data-roles="gestor,secretario_escolar">▤ <span>Matrículas</span></button>
+        <button class="nav-item" data-page="turmas" data-roles="gestor,secretario_escolar">▥ <span>Turmas</span></button>
+        <button class="nav-item" data-page="diario" data-roles="gestor,secretario_escolar,professor">▧ <span>Diário de classe</span></button>
         <button class="nav-item" data-page="matriz" data-roles="secretaria,gestor,secretario_escolar,professor">◫ <span>Matriz curricular</span></button>
         <button class="nav-item" data-page="censo" data-roles="gestor,secretario_escolar">◧ <span>Censo escolar</span></button>
         <button class="nav-item" data-page="relatorios" data-roles="secretaria,gestor">▤ <span>Relatórios</span></button>
@@ -89,12 +89,18 @@
           <article class="stat"><span>Turmas cadastradas</span><strong id="stat-turmas">—</strong><small>Turmas disponíveis</small></article>
           <article class="stat"><span>Escolas</span><strong id="stat-escolas">—</strong><small>Unidades na rede</small></article>
         </div>
-        <div class="panel"><div class="panel-head"><div><h3>Acesso rápido</h3><p class="muted">Escolha uma atividade para começar.</p></div></div><div class="quick-grid">
-          <button data-goto="alunos" class="quick"><b>＋</b><strong>Cadastrar aluno</strong><span>Adicionar estudante à base</span></button>
-          <button data-goto="matriculas" class="quick"><b>▤</b><strong>Gerenciar matrículas</strong><span>Regular e turma de AEE</span></button>
-          <button data-goto="diario" class="quick"><b>▧</b><strong>Abrir diário</strong><span>Frequência e conteúdo</span></button>
-          <button data-goto="relatorios" class="quick"><b>▥</b><strong>Ver relatórios</strong><span>Acompanhar indicadores</span></button>
-        </div></div>
+        <div class="panel">
+          <div class="panel-head"><div><h3>Acesso rápido</h3><p class="muted">Escolha uma atividade para começar.</p></div></div>
+          <div class="quick-grid">
+            <button data-goto="alunos" data-roles="secretaria,gestor,secretario_escolar" class="quick"><b>＋</b><strong>Cadastrar aluno</strong><span>Adicionar estudante à base</span></button>
+            <button data-goto="matriculas" data-roles="gestor,secretario_escolar" class="quick"><b>▤</b><strong>Gerenciar matrículas</strong><span>Regular e turma de AEE</span></button>
+            <button data-goto="turmas" data-roles="gestor,secretario_escolar" class="quick"><b>▥</b><strong>Gerenciar turmas</strong><span>Criar e organizar turmas</span></button>
+            <button data-goto="diario" data-roles="gestor,secretario_escolar,professor" class="quick"><b>▧</b><strong>Abrir diário</strong><span>Frequência e conteúdo</span></button>
+            <button data-goto="escolas" data-roles="secretaria" class="quick"><b>⌂</b><strong>Gerenciar escolas</strong><span>Cadastrar unidades escolares</span></button>
+            <button data-goto="usuarios" data-roles="secretaria" class="quick"><b>👤</b><strong>Gerenciar usuários</strong><span>Contas e permissões</span></button>
+            <button data-goto="relatorios" data-roles="secretaria,gestor" class="quick"><b>▥</b><strong>Ver relatórios</strong><span>Acompanhar indicadores</span></button>
+          </div>
+        </div>
       </section>
 
       <section id="page-escolas" class="page hidden">
