@@ -808,6 +808,35 @@ async function loadAll() {
     cachedStudents = students;
     cachedClasses = classes;
     cachedEnrollments = enrollments;
+
+    if (supabase && canAccessCensus()) {
+      try {
+        const remoteCensus = await fetchRows("school_census_mappings");
+        if (Array.isArray(remoteCensus) && remoteCensus.length) {
+          const mergedMap = new Map(cachedCensus.map(item => [item.id, item]));
+          for (const rc of remoteCensus) {
+            const localId = `censo-${rc.school_id}-${rc.census_year}`;
+            const prevLocal = mergedMap.get(localId);
+            mergedMap.set(localId, {
+              id: localId,
+              school_id: rc.school_id,
+              school_name: cachedSchools.find(s => s.id === rc.school_id)?.name || prevLocal?.school_name || "—",
+              census_year: rc.census_year,
+              operating_status: rc.operating_status || "Em atividade",
+              offered_stages: rc.offered_stages || "",
+              infrastructure_notes: rc.infrastructure_notes || "",
+              validation_status: rc.validation_status || "Pendente",
+              modules: (rc.modules_data && Object.keys(rc.modules_data).length) ? rc.modules_data : (prevLocal?.modules || {})
+            });
+          }
+          cachedCensus = Array.from(mergedMap.values());
+          saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
+        }
+      } catch (e) {
+        console.warn("Tabela school_census_mappings não lida remotamente:", e);
+      }
+    }
+
     updateSecretariaSchoolDatalist();
     await loadProfiles();
     applySchoolScope();
@@ -1056,7 +1085,8 @@ $("school-form")?.addEventListener("submit", async e => {
         ...draftSchoolCensusModules,
         identificacao_escola: {
           ...idBlock,
-          nome_escola: createdSchool.name
+          nome_escola: createdSchool.name,
+          codigo_inep: createdSchool.inep_code || idBlock.codigo_inep || ""
         }
       };
 
@@ -1466,7 +1496,7 @@ $("monitors-body")?.addEventListener("click", e => {
   notice("Monitor removido.");
 });
 
-// --- MAPEAMENTO DO CENSO ESCOLAR (EXCLUSIVO PARA SECRETÁRIO ESCOLAR E GESTOR ESCOLAR VINCULADOS) ---
+// --- MAPEAMENTO DO CENSO ESCOLAR (MIGRAÇÃO COMPLETA E EDIÇÃO PARA SECRETÁRIO ESCOLAR E GESTOR ESCOLAR) ---
 function getSelectedCensusSchoolId() {
   if (!canAccessCensus()) return "";
   return currentProfile?.school_id || "";
@@ -1487,15 +1517,119 @@ function countFilledCensusModules(entry) {
   return CENSUS_MODULES.filter(mod => hasModuleData(mods[mod.key])).length;
 }
 
+function buildMigratedModulesFromSchool(school, existingModules = {}) {
+  if (!school) return { ...existingModules };
+  const addrParts = String(school.address || "").split("·").map(p => p.trim()).filter(Boolean);
+  const logradouro = addrParts[0] || "";
+  const numeroBairro = addrParts[1] || "";
+  const cep = addrParts[2] || "";
+
+  const prevId = existingModules.identificacao_escola || {};
+  const prevAddr = existingModules.endereco || {};
+  const prevContact = existingModules.contatos || {};
+  const prevManager = existingModules.dados_gestor || {};
+  const prevOrg = existingModules.organizacao_ensino || {};
+
+  return {
+    ...existingModules,
+    identificacao_escola: {
+      ...prevId,
+      nome_escola: prevId.nome_escola || school.name || "",
+      codigo_inep: prevId.codigo_inep || school.inep_code || "",
+      situacao_funcionamento: prevId.situacao_funcionamento || "Em atividade",
+      dependencia_administrativa: prevId.dependencia_administrativa || "Municipal"
+    },
+    endereco: {
+      ...prevAddr,
+      cep: prevAddr.cep || cep,
+      logradouro: prevAddr.logradouro || logradouro,
+      numero_bairro: prevAddr.numero_bairro || numeroBairro
+    },
+    contatos: {
+      ...prevContact,
+      telefone_principal: prevContact.telefone_principal || school.phone || ""
+    },
+    dados_gestor: {
+      ...prevManager,
+      nome_gestor: prevManager.nome_gestor || school.manager_name || ""
+    },
+    organizacao_ensino: {
+      ...prevOrg,
+      etapas_ofertadas: prevOrg.etapas_ofertadas || school.curriculum_offer || ""
+    }
+  };
+}
+
 function getDefaultFieldValueForModule(modKey, fieldName, school) {
   if (!school) return "";
+  const addrParts = String(school.address || "").split("·").map(p => p.trim()).filter(Boolean);
   if (modKey === "identificacao_escola" && fieldName === "nome_escola") return school.name || "";
   if (modKey === "identificacao_escola" && fieldName === "codigo_inep") return school.inep_code || "";
-  if (modKey === "endereco" && fieldName === "logradouro") return school.address || "";
+  if (modKey === "identificacao_escola" && fieldName === "situacao_funcionamento") return "Em atividade";
+  if (modKey === "identificacao_escola" && fieldName === "dependencia_administrativa") return "Municipal";
+  if (modKey === "endereco" && fieldName === "logradouro") return addrParts[0] || school.address || "";
+  if (modKey === "endereco" && fieldName === "numero_bairro") return addrParts[1] || "";
+  if (modKey === "endereco" && fieldName === "cep") return addrParts[2] || "";
   if (modKey === "contatos" && fieldName === "telefone_principal") return school.phone || "";
   if (modKey === "dados_gestor" && fieldName === "nome_gestor") return school.manager_name || "";
   if (modKey === "organizacao_ensino" && fieldName === "etapas_ofertadas") return school.curriculum_offer || "";
   return "";
+}
+
+async function ensureSchoolMigratedToCensus(school, year = getSelectedCensusYear(), forceOverwrite = false) {
+  if (!school?.id) return null;
+  const existing = getCurrentCensusEntry(school.id, year);
+  const migratedModules = buildMigratedModulesFromSchool(school, existing?.modules || {});
+
+  const entry = {
+    id: `censo-${school.id}-${year}`,
+    school_id: school.id,
+    school_name: school.name,
+    census_year: year,
+    operating_status: (!forceOverwrite && existing?.operating_status) ? existing.operating_status : "Em atividade",
+    offered_stages: (!forceOverwrite && existing?.offered_stages)
+      ? existing.offered_stages
+      : (school.curriculum_offer || migratedModules.organizacao_ensino?.etapas_ofertadas || "Comum"),
+    infrastructure_notes: (!forceOverwrite && existing?.infrastructure_notes)
+      ? existing.infrastructure_notes
+      : (migratedModules.computadores_internet?.acesso_internet || ""),
+    validation_status: (!forceOverwrite && existing?.validation_status) ? existing.validation_status : "Em conferência",
+    modules: migratedModules
+  };
+
+  if (!existing || forceOverwrite) {
+    await persistCensusEntry(entry);
+  } else {
+    entry.modules = migratedModules;
+  }
+
+  return entry;
+}
+
+function populateCensusFormWithSchool(school, year = getSelectedCensusYear()) {
+  if (!school) return;
+  const existing = getCurrentCensusEntry(school.id, year);
+  const migratedModules = buildMigratedModulesFromSchool(school, existing?.modules || {});
+
+  if ($("census-school")) {
+    $("census-school").value = school.id;
+    $("census-school").disabled = true;
+  }
+  if ($("census-year-input")) {
+    $("census-year-input").value = year;
+  }
+  if ($("census-operating-status")) {
+    $("census-operating-status").value = existing?.operating_status || migratedModules.identificacao_escola?.situacao_funcionamento || "Em atividade";
+  }
+  if ($("census-offered-stages")) {
+    $("census-offered-stages").value = existing?.offered_stages || school.curriculum_offer || migratedModules.organizacao_ensino?.etapas_ofertadas || "";
+  }
+  if ($("census-infrastructure-notes")) {
+    $("census-infrastructure-notes").value = existing?.infrastructure_notes || migratedModules.computadores_internet?.acesso_internet || migratedModules.acessibilidade?.recursos_acessibilidade || "";
+  }
+  if ($("census-validation-status")) {
+    $("census-validation-status").value = existing?.validation_status || "Pendente";
+  }
 }
 
 function renderCensusModulesGrid() {
@@ -1522,12 +1656,14 @@ function renderCensusModulesGrid() {
 
   blocksSection.classList.remove("hidden");
   if ($("census-blocks-hint")) {
-    $("census-blocks-hint").textContent = `Unidade vinculada: ${school.name}. Clique em qualquer bloco abaixo para preencher ou editar os dados do Censo Escolar.`;
+    const idLabel = school.school_code ? ` · ID ${school.school_code}` : "";
+    const inepLabel = school.inep_code ? ` · INEP ${school.inep_code}` : "";
+    $("census-blocks-hint").textContent = `Unidade vinculada: ${school.name}${idLabel}${inepLabel}. Clique em qualquer bloco para editar ou atualizar as informações.`;
   }
 
   const year = getSelectedCensusYear();
   const entry = getCurrentCensusEntry(schoolId, year);
-  const modulesData = entry?.modules || {};
+  const modulesData = buildMigratedModulesFromSchool(school, entry?.modules || {});
 
   grid.innerHTML = CENSUS_MODULES.map(mod => {
     const savedMod = modulesData[mod.key] || {};
@@ -1537,10 +1673,10 @@ function renderCensusModulesGrid() {
     return `<button
       type="button"
       data-census-module="${escapeHtml(mod.key)}"
-      style="background:${isActive ? "#d3e8ca" : "#e3f1dc"};color:#2c3e28;border:${isActive ? "2px solid #4c833c" : "1px solid #c9dfbe"};border-radius:10px;padding:18px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;text-align:center;min-height:105px;transition:transform 0.12s ease;">
-      <span style="font-size:1.35rem;line-height:1;color:#222820;">${escapeHtml(mod.icon)}</span>
-      <strong style="font-size:0.9rem;font-weight:600;color:#2a3527;">${escapeHtml(mod.label)}</strong>
-      <span style="font-size:0.75rem;color:${hasData ? "#2e6b27" : "#5c6b58"};">${hasData ? "Preenchido · Editar" : "Pendente · Editar"}</span>
+      style="background:${isActive ? "#d3e8ca" : (hasData ? "#dcefd4" : "#e3f1dc")};color:#2c3e28;border:${isActive ? "2px solid #4c833c" : "1px solid #c9dfbe"};border-radius:8px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-align:center;">
+      <span style="font-size:1.15rem;line-height:1;">${escapeHtml(mod.icon)}</span>
+      <strong style="font-size:0.82rem;font-weight:600;">${escapeHtml(mod.label)}</strong>
+      <span style="font-size:0.72rem;font-weight:${hasData ? "600" : "400"};color:${hasData ? "#255e1e" : "#5c6b58"};">${hasData ? "Preenchido · Editar" : "Disponível"}</span>
     </button>`;
   }).join("");
 }
@@ -1568,7 +1704,8 @@ function openCensusModuleEditor(modKey) {
   renderCensusModulesGrid();
 
   const entry = getCurrentCensusEntry(schoolId, year);
-  const savedMod = entry?.modules?.[modKey] || {};
+  const migratedModules = buildMigratedModulesFromSchool(school, entry?.modules || {});
+  const savedMod = migratedModules[modKey] || {};
 
   if ($("census-editor-title")) $("census-editor-title").textContent = `${mod.icon} ${mod.label}`;
   if ($("census-editor-subtitle")) {
@@ -1578,7 +1715,7 @@ function openCensusModuleEditor(modKey) {
   fieldsContainer.innerHTML = mod.fields.map(field => {
     const rawSaved = savedMod[field.name];
     const fallbackVal = getDefaultFieldValueForModule(modKey, field.name, school);
-    const val = rawSaved !== undefined ? rawSaved : fallbackVal;
+    const val = (rawSaved !== undefined && String(rawSaved).trim() !== "") ? rawSaved : fallbackVal;
 
     if (Array.isArray(field.options)) {
       return `<label>${escapeHtml(field.label)}
@@ -1601,6 +1738,8 @@ function openCensusModuleEditor(modKey) {
 function renderCensus() {
   if (!$("census-body") || !canAccessCensus()) return;
   const effectiveId = getSelectedCensusSchoolId();
+  const school = cachedSchools.find(s => s.id === effectiveId);
+  const year = getSelectedCensusYear();
   const scopedSchools = getScopedSchools();
   const scopedStudents = getScopedStudents();
   const scopedEnrollments = getScopedEnrollments();
@@ -1611,14 +1750,13 @@ function renderCensus() {
       .map(e => e.student_id)
   );
 
+  if (school) {
+    populateCensusFormWithSchool(school, year);
+  }
+
   const visibleCensus = effectiveId
     ? cachedCensus.filter(c => c.school_id === effectiveId)
     : [];
-
-  if ($("census-school")) {
-    $("census-school").value = effectiveId;
-    $("census-school").disabled = true;
-  }
 
   if ($("censo-schools-count")) $("censo-schools-count").textContent = scopedSchools.length;
   if ($("censo-students-count")) $("censo-students-count").textContent = validStudents.length;
@@ -1627,20 +1765,52 @@ function renderCensus() {
   renderCensusModulesGrid();
 
   $("census-body").innerHTML = visibleCensus.map(row => {
-    const school = cachedSchools.find(s => s.id === row.school_id);
-    const filledCount = countFilledCensusModules(row);
+    const linkedSchool = cachedSchools.find(s => s.id === row.school_id) || school;
+    const mergedRow = {
+      ...row,
+      modules: buildMigratedModulesFromSchool(linkedSchool, row.modules || {})
+    };
+    const filledCount = countFilledCensusModules(mergedRow);
     return `<tr>
-      <td>${escapeHtml(school?.name || row.school_name || "—")}</td>
-      <td>${escapeHtml(school?.inep_code || "Sem INEP")}</td>
+      <td>${escapeHtml(linkedSchool?.name || row.school_name || "—")}</td>
+      <td>${escapeHtml(linkedSchool?.inep_code || "Sem INEP")}</td>
       <td>${escapeHtml(String(row.census_year))}</td>
       <td>${escapeHtml(row.operating_status)}</td>
       <td>${escapeHtml(row.offered_stages)}</td>
       <td>${filledCount} / ${CENSUS_MODULES.length}</td>
       <td>${escapeHtml(row.validation_status)}</td>
-      <td><span class="muted small">Unidade vinculada</span></td>
+      <td><button type="button" class="secondary small" data-edit-census-year="${escapeHtml(String(row.census_year))}">Editar</button></td>
     </tr>`;
   }).join("") || '<tr><td colspan="8">Nenhum mapeamento do Censo Escolar registrado para sua unidade ainda.</td></tr>';
 }
+
+$("census-body")?.addEventListener("click", e => {
+  const btn = e.target.closest("[data-edit-census-year]");
+  if (!btn || !canAccessCensus()) return;
+  const targetYear = Number(btn.dataset.editCensusYear) || getSelectedCensusYear();
+  if ($("census-year-input")) $("census-year-input").value = targetYear;
+  const school = cachedSchools.find(s => s.id === getSelectedCensusSchoolId());
+  if (school) {
+    populateCensusFormWithSchool(school, targetYear);
+    renderCensusModulesGrid();
+    openCensusModuleEditor(activeCensusModuleKey || "identificacao_escola");
+  }
+});
+
+$("census-sync-school-data")?.addEventListener("click", async () => {
+  if (!canAccessCensus()) return;
+  const school = cachedSchools.find(s => s.id === getSelectedCensusSchoolId());
+  if (!school) {
+    notice("Nenhuma unidade escolar vinculada ao seu perfil.", true);
+    return;
+  }
+  const year = getSelectedCensusYear();
+  await ensureSchoolMigratedToCensus(school, year, true);
+  populateCensusFormWithSchool(school, year);
+  renderCensus();
+  if (activeCensusModuleKey) openCensusModuleEditor(activeCensusModuleKey);
+  notice(`Informações da escola "${school.name}" migradas para o Censo (${year}).`);
+});
 
 $("census-modules-grid")?.addEventListener("click", e => {
   const card = e.target.closest("[data-census-module]");
@@ -1656,6 +1826,8 @@ $("census-close-editor")?.addEventListener("click", () => {
 
 $("census-year-input")?.addEventListener("change", () => {
   if (!canAccessCensus()) return;
+  const school = cachedSchools.find(s => s.id === getSelectedCensusSchoolId());
+  if (school) populateCensusFormWithSchool(school, getSelectedCensusYear());
   renderCensusModulesGrid();
   if (activeCensusModuleKey) openCensusModuleEditor(activeCensusModuleKey);
 });
@@ -1682,6 +1854,50 @@ async function persistCensusEntry(entry) {
   }
 }
 
+async function syncSchoolRecordFromCensusModules(school, modulesData, formData = {}) {
+  if (!supabase || !school?.id) return;
+  const idMod = modulesData.identificacao_escola || {};
+  const addrMod = modulesData.endereco || {};
+  const contactMod = modulesData.contatos || {};
+  const managerMod = modulesData.dados_gestor || {};
+  const orgMod = modulesData.organizacao_ensino || {};
+
+  const nextName = String(idMod.nome_escola || school.name || "").trim();
+  const nextInep = String(idMod.codigo_inep ?? school.inep_code ?? "").trim() || null;
+  const nextCurriculum = String(formData.offered_stages || orgMod.etapas_ofertadas || school.curriculum_offer || "Comum").trim() || "Comum";
+  const mergedAddress = [addrMod.logradouro, addrMod.numero_bairro, addrMod.cep]
+    .map(v => String(v || "").trim())
+    .filter(Boolean)
+    .join(" · ") || school.address || null;
+  const nextPhone = String(contactMod.telefone_principal ?? school.phone ?? "").trim() || null;
+  const nextManager = String(managerMod.nome_gestor ?? school.manager_name ?? "").trim() || null;
+
+  const updatePayload = {
+    name: nextName || school.name,
+    inep_code: nextInep,
+    curriculum_offer: nextCurriculum,
+    address: mergedAddress,
+    phone: nextPhone,
+    manager_name: nextManager
+  };
+
+  try {
+    const { data: updatedSchool, error } = await supabase
+      .from("schools")
+      .update(updatePayload)
+      .eq("id", school.id)
+      .select()
+      .single();
+    if (!error && updatedSchool) {
+      cachedSchools = cachedSchools.map(s => s.id === school.id ? updatedSchool : s);
+      updateHomeSchoolCard();
+      updateRoleLabel();
+    }
+  } catch (err) {
+    console.warn("Não foi possível atualizar os dados espelhados da escola:", err);
+  }
+}
+
 $("census-save-module")?.addEventListener("click", async () => {
   if (!canAccessCensus()) {
     notice("Apenas Secretário escolar e Gestor escolar podem salvar blocos do Censo.", true);
@@ -1702,25 +1918,27 @@ $("census-save-module")?.addEventListener("click", async () => {
   });
 
   const existing = getCurrentCensusEntry(schoolId, year);
-  const currentModules = { ...(existing?.modules || {}), [activeCensusModuleKey]: modValues };
+  const baseModules = buildMigratedModulesFromSchool(school, existing?.modules || {});
+  const currentModules = { ...baseModules, [activeCensusModuleKey]: modValues };
 
   const entry = {
     id: `censo-${school.id}-${year}`,
     school_id: school.id,
-    school_name: school.name,
+    school_name: currentModules.identificacao_escola?.nome_escola || school.name,
     census_year: year,
-    operating_status: existing?.operating_status || $("census-operating-status")?.value || "Em atividade",
-    offered_stages: existing?.offered_stages || $("census-offered-stages")?.value || school.curriculum_offer || "Comum",
-    infrastructure_notes: existing?.infrastructure_notes || $("census-infrastructure-notes")?.value || "",
+    operating_status: currentModules.identificacao_escola?.situacao_funcionamento || existing?.operating_status || $("census-operating-status")?.value || "Em atividade",
+    offered_stages: existing?.offered_stages || currentModules.organizacao_ensino?.etapas_ofertadas || $("census-offered-stages")?.value || school.curriculum_offer || "Comum",
+    infrastructure_notes: existing?.infrastructure_notes || currentModules.computadores_internet?.acesso_internet || $("census-infrastructure-notes")?.value || "",
     validation_status: existing?.validation_status || $("census-validation-status")?.value || "Em conferência",
     modules: currentModules
   };
 
   await persistCensusEntry(entry);
+  await syncSchoolRecordFromCensusModules(school, currentModules, { offered_stages: entry.offered_stages });
   const modLabel = CENSUS_MODULES.find(m => m.key === activeCensusModuleKey)?.label || "Bloco";
   renderCensus();
   openCensusModuleEditor(activeCensusModuleKey);
-  notice(`Bloco "${modLabel}" salvo para ${school.name} (${year}).`);
+  notice(`Bloco "${modLabel}" salvo e atualizado para ${school.name} (${year}).`);
 });
 
 $("census-form")?.addEventListener("submit", async e => {
@@ -1738,20 +1956,29 @@ $("census-form")?.addEventListener("submit", async e => {
   }
   const year = Number(data.census_year) || new Date().getFullYear();
   const existing = getCurrentCensusEntry(school.id, year);
+  const mergedModules = buildMigratedModulesFromSchool(school, existing?.modules || {});
+
+  if (mergedModules.identificacao_escola) {
+    mergedModules.identificacao_escola.situacao_funcionamento = data.operating_status;
+  }
+  if (mergedModules.organizacao_ensino && data.offered_stages) {
+    mergedModules.organizacao_ensino.etapas_ofertadas = String(data.offered_stages || "").trim();
+  }
 
   const entry = {
     id: `censo-${school.id}-${year}`,
     school_id: school.id,
-    school_name: school.name,
+    school_name: mergedModules.identificacao_escola?.nome_escola || school.name,
     census_year: year,
     operating_status: data.operating_status,
     offered_stages: String(data.offered_stages || "").trim(),
     infrastructure_notes: String(data.infrastructure_notes || "").trim(),
     validation_status: data.validation_status,
-    modules: existing?.modules || {}
+    modules: mergedModules
   };
 
   await persistCensusEntry(entry);
+  await syncSchoolRecordFromCensusModules(school, mergedModules, data);
   renderCensus();
   notice(`Mapeamento do Censo salvo para ${school.name}.`);
 });
