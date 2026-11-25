@@ -20,7 +20,207 @@ let attendanceRows = [];
 
 const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v2";
 const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
-const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v1";
+const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v2";
+
+// 21 blocos exibidos na seção CENSO ESCOLAR[cite: 4]
+const CENSUS_MODULES = [
+  {
+    key: "identificacao_escola",
+    label: "Identificação Escola",
+    icon: "||| |||",
+    fields: [
+      { name: "codigo_inep", label: "Código INEP", placeholder: "Ex.: 29235146" },
+      { name: "situacao_funcionamento", label: "Situação de funcionamento", options: ["Em atividade", "Paralisada", "Extinta"] },
+      { name: "dependencia_administrativa", label: "Dependência administrativa", options: ["Municipal", "Estadual", "Federal", "Privada"] },
+      { name: "regulamentacao", label: "Regulamentação / Autorização", placeholder: "Ex.: Autorizada pelo Conselho Municipal" }
+    ]
+  },
+  {
+    key: "endereco",
+    label: "Endereço",
+    icon: "⚑",
+    fields: [
+      { name: "cep", label: "CEP", placeholder: "00000-000" },
+      { name: "logradouro", label: "Logradouro / Endereço", placeholder: "Rua, Avenida, Rodovia..." },
+      { name: "numero_bairro", label: "Número / Bairro", placeholder: "Ex.: 120 - Centro" },
+      { name: "localizacao_zona", label: "Localização / Zona", options: ["Urbana", "Rural"] }
+    ]
+  },
+  {
+    key: "contatos",
+    label: "Contatos",
+    icon: "☎",
+    fields: [
+      { name: "telefone_principal", label: "Telefone principal", placeholder: "(00) 0000-0000" },
+      { name: "telefone_secundario", label: "Telefone secundário / Celular", placeholder: "(00) 90000-0000" },
+      { name: "email_institucional", label: "E-mail institucional", placeholder: "escola@educacao.gov.br" }
+    ]
+  },
+  {
+    key: "dados_gestor",
+    label: "Dados do gestor",
+    icon: "👤",
+    fields: [
+      { name: "nome_gestor", label: "Nome do gestor(a) escolar", placeholder: "Nome completo" },
+      { name: "cargo_gestor", label: "Cargo / Função", options: ["Diretor(a)", "Gestor(a) Escolar", "Coordenador(a) Pedagógico(a)", "Responsável pela Unidade"] },
+      { name: "email_gestor", label: "E-mail do gestor", placeholder: "gestor@educacao.gov.br" }
+    ]
+  },
+  {
+    key: "local_funcionamento",
+    label: "Local de funcionamento",
+    icon: "📍",
+    fields: [
+      { name: "tipo_local", label: "Local de funcionamento", options: ["Prédio escolar", "Galpão / Anexo", "Sala em outra escola", "Unidade socioeducativa", "Unidade prisional", "Outro"] },
+      { name: "compartilhado", label: "Prédio compartilhado com outra escola?", options: ["Não", "Sim"] },
+      { name: "forma_ocupacao", label: "Forma de ocupação do prédio", options: ["Próprio", "Alugado", "Cedido"] }
+    ]
+  },
+  {
+    key: "abastecimento_agua",
+    label: "Abastecimento de água",
+    icon: "💧",
+    fields: [
+      { name: "fonte_agua", label: "Abastecimento de água", options: ["Rede pública", "Poço artesiano", "Cacimba / Cisterna / Poço", "Fonte / Rio / Igarapé", "Não há abastecimento de água"] },
+      { name: "agua_potavel", label: "Água potável para consumo?", options: ["Sim", "Não"] }
+    ]
+  },
+  {
+    key: "abastecimento_energia",
+    label: "Abastecimento de energia",
+    icon: "⚡",
+    fields: [
+      { name: "fonte_energia", label: "Abastecimento de energia elétrica", options: ["Rede pública", "Gerador movido a combustível", "Fonte de energia renovável / Solar", "Não há energia elétrica"] },
+      { name: "energia_ativa", label: "Energia em funcionamento regular?", options: ["Sim", "Não"] }
+    ]
+  },
+  {
+    key: "rede_esgoto",
+    label: "Rede de esgoto",
+    icon: "🍃",
+    fields: [
+      { name: "tipo_esgoto", label: "Esgotamento sanitário", options: ["Rede pública", "Fossa séptica", "Fossa rudimentar / Comum", "Não há rede de esgoto"] }
+    ]
+  },
+  {
+    key: "destinacao_lixo",
+    label: "Destinação do lixo",
+    icon: "🗑",
+    fields: [
+      { name: "coleta_lixo", label: "Serviço de coleta / Destinação do lixo", options: ["Coleta periódica", "Queima", "Enterra", "Leva a destinação licenciada", "Não há coleta"] },
+      { name: "separacao_reciclagem", label: "Faz separação / reciclagem de resíduos?", options: ["Sim", "Não"] }
+    ]
+  },
+  {
+    key: "dependencias_fisicas",
+    label: "Dependências física",
+    icon: "▤",
+    fields: [
+      { name: "salas_aula", label: "Salas de aula / Atendimento", placeholder: "Ex.: 8 salas de aula" },
+      { name: "espacos_apoio", label: "Salas administrativas / Biblioteca / Refeitório / Quadra", placeholder: "Ex.: Secretaria, cozinha, pátio coberto" },
+      { name: "sanitarios", label: "Sanitários (alunos, acessíveis, funcionários)", placeholder: "Ex.: 4 banheiros de alunos, 1 PcD" }
+    ]
+  },
+  {
+    key: "acessibilidade",
+    label: "Acessibilidade",
+    icon: "♿",
+    fields: [
+      { name: "recursos_acessibilidade", label: "Recursos de acessibilidade arquitetônica", placeholder: "Ex.: Rampas, corrimão, sanitário acessível, piso tátil" },
+      { name: "atendimento_pcd", label: "Atendimento educacional adaptado para PcD?", options: ["Sim", "Não"] }
+    ]
+  },
+  {
+    key: "equipamentos",
+    label: "Equipamentos",
+    icon: "▭",
+    fields: [
+      { name: "equipamentos_gerais", label: "Equipamentos da unidade", placeholder: "Ex.: TV, projetor, impressora, copiadora, som" }
+    ]
+  },
+  {
+    key: "equipamentos_aprendizagem",
+    label: "Equipamentos aprendizagem",
+    icon: "🎧",
+    fields: [
+      { name: "recursos_pedagogicos", label: "Equipamentos e materiais de aprendizagem", placeholder: "Ex.: Tablets, kits de robótica, fones, jogos educativos" }
+    ]
+  },
+  {
+    key: "computadores_internet",
+    label: "Computadores / Internet",
+    icon: "📡",
+    fields: [
+      { name: "computadores_escola", label: "Computadores / Notebooks / Tablets", placeholder: "Ex.: 10 computadores na secretaria/lab" },
+      { name: "acesso_internet", label: "Acesso à internet", options: ["Banda larga", "Fibra óptica / Satélite", "Sem acesso à internet"] },
+      { name: "rede_alunos", label: "Internet disponível para uso dos alunos?", options: ["Sim", "Não"] }
+    ]
+  },
+  {
+    key: "instrumentos_ensino",
+    label: "Instrumentos de ensino",
+    icon: "🧩",
+    fields: [
+      { name: "instrumentos_pedagogicos", label: "Instrumentos e acervos de ensino", placeholder: "Ex.: Acervo literário, mapas, material didático, laboratório" }
+    ]
+  },
+  {
+    key: "sistema_cotas",
+    label: "Sistema de cotas",
+    icon: "⇊",
+    fields: [
+      { name: "possui_cotas", label: "Adota reserva de vagas / sistema de cotas?", options: ["Não se aplica / Não", "Sim - PPI (Pretos, Pardos e Indígenas)", "Sim - PcD", "Sim - Renda / Escola pública"] },
+      { name: "detalhes_cotas", label: "Observações sobre cotas / critérios", placeholder: "Detalhes normativos ou critérios" }
+    ]
+  },
+  {
+    key: "lingua",
+    label: "Língua",
+    icon: "🌐",
+    fields: [
+      { name: "lingua_instrucao", label: "Língua em que o ensino é ministrado", options: ["Língua Portuguesa", "Língua Indígena", "Libras / Bilíngue", "Outra"] },
+      { name: "lingua_estrangeira_adicional", label: "Idioma / Língua adicional ofertada", placeholder: "Ex.: Inglês, Espanhol, Libras" }
+    ]
+  },
+  {
+    key: "organizacao_ensino",
+    label: "Organização do ensino",
+    icon: "↓19",
+    fields: [
+      { name: "forma_organizacao", label: "Formas de organização", options: ["Séries / Anos regulares", "Ciclos do ensino fundamental", "Grupos não seriados", "Módulos / Alternância", "Etapas combinadas"] },
+      { name: "etapas_ofertadas", label: "Etapas ofertadas", placeholder: "Ex.: Educação Infantil, Ensino Fundamental I e II" }
+    ]
+  },
+  {
+    key: "orgaos_colegiados",
+    label: "Orgãos colegiados",
+    icon: "⚖",
+    fields: [
+      { name: "orgaos_ativos", label: "Órgãos colegiados em funcionamento", placeholder: "Ex.: Conselho Escolar, APM / Caixa Escolar, Grêmio Estudantil" },
+      { name: "participacao_comunidade", label: "Reuniões periódicas com a comunidade?", options: ["Sim", "Não"] }
+    ]
+  },
+  {
+    key: "recursos_humanos",
+    label: "Recursos Humanos",
+    icon: "👥",
+    fields: [
+      { name: "equipe_docente_gestao", label: "Professores, gestores e equipe pedagógica", placeholder: "Ex.: 14 professores, 1 gestor, 1 coordenador" },
+      { name: "equipe_apoio_monitores", label: "Secretaria, apoio operacional e monitores", placeholder: "Ex.: 2 secretários, 3 merendeiras/limpeza, 2 monitores" }
+    ]
+  },
+  {
+    key: "educacao_ambiental",
+    label: "Educação Ambiental",
+    icon: "🌲",
+    fields: [
+      { name: "acoes_ambientais", label: "Práticas / Projetos de Educação Ambiental", options: ["Sim - Inserida no currículo e projetos", "Sim - Ações pontuais / Horta / Reciclagem", "Não desenvolve"] },
+      { name: "descricao_ambiental", label: "Descrição das ações ambientais", placeholder: "Ex.: Horta escolar, compostagem, coleta seletiva" }
+    ]
+  }
+];
+
+let activeCensusModuleKey = null;
 
 const defaultCurriculum = [
   { id: "curr-1", stage: "Educação Infantil", subject: "O eu, o outro e o nós", area: "Campos de Experiência", requirement_type: "obrigatoria", annual_hours: 800 },
@@ -1023,7 +1223,114 @@ $("monitors-body")?.addEventListener("click", e => {
   notice("Monitor removido.");
 });
 
-// --- MAPEAMENTO DO CENSO ESCOLAR ---
+// --- MAPEAMENTO DO CENSO ESCOLAR (21 BLOCOS DA IMAGEM) ---
+function getSelectedCensusSchoolId() {
+  const selectVal = $("census-school")?.value;
+  if (selectVal) return selectVal;
+  return isSecretaria() ? (selectedSchoolId || cachedSchools[0]?.id || "") : getEffectiveSchoolId();
+}
+
+function getSelectedCensusYear() {
+  const y = Number($("census-year-input")?.value);
+  return y || new Date().getFullYear();
+}
+
+function getCurrentCensusEntry(schoolId = getSelectedCensusSchoolId(), year = getSelectedCensusYear()) {
+  if (!schoolId) return null;
+  return cachedCensus.find(c => c.school_id === schoolId && Number(c.census_year) === Number(year)) || null;
+}
+
+function countFilledCensusModules(entry) {
+  const mods = entry?.modules || {};
+  return CENSUS_MODULES.filter(mod => {
+    const data = mods[mod.key];
+    return data && Object.values(data).some(v => String(v || "").trim().length > 0);
+  }).length;
+}
+
+function getDefaultFieldValueForModule(modKey, fieldName, school) {
+  if (!school) return "";
+  if (modKey === "identificacao_escola" && fieldName === "codigo_inep") return school.inep_code || "";
+  if (modKey === "endereco" && fieldName === "logradouro") return school.address || "";
+  if (modKey === "contatos" && fieldName === "telefone_principal") return school.phone || "";
+  if (modKey === "dados_gestor" && fieldName === "nome_gestor") return school.manager_name || "";
+  if (modKey === "organizacao_ensino" && fieldName === "etapas_ofertadas") return school.curriculum_offer || "";
+  return "";
+}
+
+function renderCensusModulesGrid() {
+  const grid = $("census-modules-grid");
+  if (!grid) return;
+
+  const schoolId = getSelectedCensusSchoolId();
+  const year = getSelectedCensusYear();
+  const entry = getCurrentCensusEntry(schoolId, year);
+  const modulesData = entry?.modules || {};
+
+  grid.innerHTML = CENSUS_MODULES.map(mod => {
+    const savedMod = modulesData[mod.key] || {};
+    const hasData = Object.values(savedMod).some(v => String(v || "").trim().length > 0);
+    const isActive = activeCensusModuleKey === mod.key;
+
+    return `<button
+      type="button"
+      data-census-module="${escapeHtml(mod.key)}"
+      style="background:${isActive ? "#d3e8ca" : "#e3f1dc"};color:#2c3e28;border:${isActive ? "2px solid #4c833c" : "1px solid #c9dfbe"};border-radius:10px;padding:18px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;text-align:center;min-height:105px;transition:transform 0.12s ease;">
+      <span style="font-size:1.35rem;line-height:1;color:#222820;">${escapeHtml(mod.icon)}</span>
+      <strong style="font-size:0.9rem;font-weight:600;color:#2a3527;">${escapeHtml(mod.label)}</strong>
+      <span style="font-size:0.75rem;color:${hasData ? "#2e6b27" : "#5c6b58"};">${hasData ? "Preenchido" : "Pendente"}</span>
+    </button>`;
+  }).join("");
+}
+
+function openCensusModuleEditor(modKey) {
+  const mod = CENSUS_MODULES.find(m => m.key === modKey);
+  const editor = $("census-module-editor");
+  const fieldsContainer = $("census-module-fields");
+  if (!mod || !editor || !fieldsContainer) return;
+
+  const schoolId = getSelectedCensusSchoolId();
+  const year = getSelectedCensusYear();
+  const school = cachedSchools.find(s => s.id === schoolId);
+  if (!school) {
+    notice("Selecione uma unidade escolar antes de preencher os blocos do Censo.", true);
+    return;
+  }
+
+  activeCensusModuleKey = modKey;
+  renderCensusModulesGrid();
+
+  const entry = getCurrentCensusEntry(schoolId, year);
+  const savedMod = entry?.modules?.[modKey] || {};
+
+  if ($("census-editor-title")) $("census-editor-title").textContent = `${mod.icon} ${mod.label}`;
+  if ($("census-editor-subtitle")) {
+    $("census-editor-subtitle").textContent = `Unidade: ${school.name} · Ano: ${year}`;
+  }
+
+  fieldsContainer.innerHTML = mod.fields.map(field => {
+    const rawSaved = savedMod[field.name];
+    const fallbackVal = getDefaultFieldValueForModule(modKey, field.name, school);
+    const val = rawSaved !== undefined ? rawSaved : fallbackVal;
+
+    if (Array.isArray(field.options)) {
+      return `<label>${escapeHtml(field.label)}
+        <select data-census-field="${escapeHtml(field.name)}">
+          ${field.options.map(opt => `<option value="${escapeHtml(opt)}"${opt === val ? " selected" : ""}>${escapeHtml(opt)}</option>`).join("")}
+        </select>
+      </label>`;
+    }
+
+    return `<label>${escapeHtml(field.label)}
+      <input type="text" maxlength="250" data-census-field="${escapeHtml(field.name)}" value="${escapeHtml(val || "")}" placeholder="${escapeHtml(field.placeholder || "")}">
+    </label>`;
+  }).join("") + `<label style="grid-column: 1 / -1;">Observações complementares do bloco
+    <input type="text" maxlength="300" data-census-field="observacoes" value="${escapeHtml(savedMod.observacoes || "")}" placeholder="Anotações adicionais para conferência do Censo">
+  </label>`;
+
+  editor.classList.remove("hidden");
+}
+
 function renderCensus() {
   if (!$("census-body")) return;
   const effectiveId = getEffectiveSchoolId();
@@ -1045,8 +1352,11 @@ function renderCensus() {
   if ($("censo-students-count")) $("censo-students-count").textContent = validStudents.length;
   if ($("censo-enrollments-count")) $("censo-enrollments-count").textContent = activeStudentIds.size;
 
+  renderCensusModulesGrid();
+
   $("census-body").innerHTML = visibleCensus.map(row => {
     const school = cachedSchools.find(s => s.id === row.school_id);
+    const filledCount = countFilledCensusModules(row);
     const delBtn = isSecretaria()
       ? `<button type="button" class="secondary small" data-delete-census="${escapeHtml(row.id)}">Excluir</button>`
       : `<span class="muted small">—</span>`;
@@ -1056,13 +1366,104 @@ function renderCensus() {
       <td>${escapeHtml(String(row.census_year))}</td>
       <td>${escapeHtml(row.operating_status)}</td>
       <td>${escapeHtml(row.offered_stages)}</td>
+      <td>${filledCount} / ${CENSUS_MODULES.length}</td>
       <td>${escapeHtml(row.validation_status)}</td>
       <td>${delBtn}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="7">Nenhum mapeamento do Censo Escolar registrado ainda.</td></tr>';
+  }).join("") || '<tr><td colspan="8">Nenhum mapeamento do Censo Escolar registrado ainda.</td></tr>';
 }
 
-$("census-form")?.addEventListener("submit", e => {
+$("census-modules-grid")?.addEventListener("click", e => {
+  const card = e.target.closest("[data-census-module]");
+  if (!card) return;
+  openCensusModuleEditor(card.dataset.censusModule);
+});
+
+$("census-close-editor")?.addEventListener("click", () => {
+  activeCensusModuleKey = null;
+  $("census-module-editor")?.classList.add("hidden");
+  renderCensusModulesGrid();
+});
+
+$("census-school")?.addEventListener("change", () => {
+  const schoolId = getSelectedCensusSchoolId();
+  const year = getSelectedCensusYear();
+  const existing = getCurrentCensusEntry(schoolId, year);
+  if (existing) {
+    if ($("census-operating-status")) $("census-operating-status").value = existing.operating_status || "Em atividade";
+    if ($("census-offered-stages")) $("census-offered-stages").value = existing.offered_stages || "";
+    if ($("census-infrastructure-notes")) $("census-infrastructure-notes").value = existing.infrastructure_notes || "";
+    if ($("census-validation-status")) $("census-validation-status").value = existing.validation_status || "Pendente";
+  }
+  renderCensusModulesGrid();
+  if (activeCensusModuleKey) openCensusModuleEditor(activeCensusModuleKey);
+});
+
+$("census-year-input")?.addEventListener("change", () => {
+  renderCensusModulesGrid();
+  if (activeCensusModuleKey) openCensusModuleEditor(activeCensusModuleKey);
+});
+
+async function persistCensusEntry(entry) {
+  cachedCensus = [entry, ...cachedCensus.filter(x => x.id !== entry.id)];
+  saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
+
+  if (supabase) {
+    try {
+      await supabase.from("school_census_mappings").upsert({
+        school_id: entry.school_id,
+        census_year: entry.census_year,
+        operating_status: entry.operating_status,
+        offered_stages: entry.offered_stages,
+        infrastructure_notes: entry.infrastructure_notes || null,
+        validation_status: entry.validation_status,
+        modules_data: entry.modules || {},
+        updated_by: currentProfile?.id || null
+      }, { onConflict: "school_id,census_year" });
+    } catch (err) {
+      console.warn("Sincronização remota do Censo não aplicada (verifique tabela school_census_mappings):", err);
+    }
+  }
+}
+
+$("census-save-module")?.addEventListener("click", async () => {
+  if (!activeCensusModuleKey) return;
+  const schoolId = getSelectedCensusSchoolId();
+  const year = getSelectedCensusYear();
+  const school = cachedSchools.find(s => s.id === schoolId);
+  if (!school) {
+    notice("Selecione uma unidade escolar válida.", true);
+    return;
+  }
+
+  const modValues = {};
+  document.querySelectorAll("#census-module-fields [data-census-field]").forEach(el => {
+    modValues[el.dataset.censusField] = String(el.value || "").trim();
+  });
+
+  const existing = getCurrentCensusEntry(schoolId, year);
+  const currentModules = { ...(existing?.modules || {}), [activeCensusModuleKey]: modValues };
+
+  const entry = {
+    id: `censo-${school.id}-${year}`,
+    school_id: school.id,
+    school_name: school.name,
+    census_year: year,
+    operating_status: existing?.operating_status || $("census-operating-status")?.value || "Em atividade",
+    offered_stages: existing?.offered_stages || $("census-offered-stages")?.value || school.curriculum_offer || "Comum",
+    infrastructure_notes: existing?.infrastructure_notes || $("census-infrastructure-notes")?.value || "",
+    validation_status: existing?.validation_status || $("census-validation-status")?.value || "Em conferência",
+    modules: currentModules
+  };
+
+  await persistCensusEntry(entry);
+  const modLabel = CENSUS_MODULES.find(m => m.key === activeCensusModuleKey)?.label || "Bloco";
+  renderCensus();
+  openCensusModuleEditor(activeCensusModuleKey);
+  notice(`Bloco "${modLabel}" salvo para ${school.name} (${year}).`);
+});
+
+$("census-form")?.addEventListener("submit", async e => {
   e.preventDefault();
   const data = formObject(e.target);
   const targetSchoolId = isSecretaria() ? data.school_id : getEffectiveSchoolId();
@@ -1071,19 +1472,22 @@ $("census-form")?.addEventListener("submit", e => {
     notice("Selecione uma unidade escolar válida para o Censo.", true);
     return;
   }
+  const year = Number(data.census_year) || new Date().getFullYear();
+  const existing = getCurrentCensusEntry(school.id, year);
+
   const entry = {
-    id: `censo-${school.id}-${data.census_year}`,
+    id: `censo-${school.id}-${year}`,
     school_id: school.id,
     school_name: school.name,
-    census_year: Number(data.census_year) || new Date().getFullYear(),
+    census_year: year,
     operating_status: data.operating_status,
     offered_stages: String(data.offered_stages || "").trim(),
     infrastructure_notes: String(data.infrastructure_notes || "").trim(),
-    validation_status: data.validation_status
+    validation_status: data.validation_status,
+    modules: existing?.modules || {}
   };
 
-  cachedCensus = [entry, ...cachedCensus.filter(x => x.id !== entry.id)];
-  saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
+  await persistCensusEntry(entry);
   renderCensus();
   notice(`Mapeamento do Censo salvo para ${school.name}.`);
 });
