@@ -102,7 +102,7 @@
           <div class="panel-head">
             <div>
               <h3>Unidades escolares</h3>
-              <p class="muted">Cadastre a unidade escolar preenchendo os blocos temáticos do Censo Escolar (começando por Identificação Escola).</p>
+              <p class="muted">Cadastre a unidade escolar preenchendo e salvando cada bloco temático do Censo Escolar (começando por Identificação Escola).</p>
             </div>
           </div>
           <form id="school-form" class="form-grid">
@@ -110,16 +110,19 @@
               <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
                 <div>
                   <strong>Blocos temáticos do Censo Escolar</strong>
-                  <p class="muted small" style="margin:2px 0 0;">Preencha os blocos desejados para cadastrar a unidade escolar.</p>
+                  <p class="muted small" id="school-census-draft-status" style="margin:2px 0 0;">Clique em um bloco, preencha os campos e clique em "Salvar bloco". Ao finalizar, clique em "Cadastrar escola".</p>
                 </div>
                 <button type="button" class="secondary small" id="toggle-school-census-panel">Abrir / Ocultar blocos do Censo</button>
               </div>
               <div id="school-census-panel" style="margin-top:12px;">
                 <div id="school-census-modules-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;"></div>
                 <div id="school-census-module-editor" class="hidden" style="margin-top:14px;padding:14px;border-radius:8px;background:#ffffff;border:1px solid #c9dfbe;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
                     <strong id="school-census-editor-title">Bloco</strong>
-                    <button type="button" class="secondary small" id="school-census-apply-module">Aplicar bloco ao cadastro da escola</button>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                      <button type="button" class="primary small" id="school-census-apply-module">Salvar bloco</button>
+                      <button type="button" class="secondary small" id="school-census-cancel-module">Fechar</button>
+                    </div>
                   </div>
                   <div id="school-census-module-fields" class="form-grid"></div>
                 </div>
