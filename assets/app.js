@@ -1180,6 +1180,14 @@ function renderSchools(visibleSchools = getScopedSchools()) {
   }).join("") || '<tr><td colspan="8">Nenhuma escola vinculada.</td></tr>';
 }
 
+async function unlinkProfilesFromSchool(schoolId) {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ school_id: null })
+    .eq("school_id", schoolId);
+  if (error) throw error;
+}
+
 $("schools-body")?.addEventListener("click", async e => {
   const delBtn = e.target.closest("[data-delete-school]");
   if (delBtn) {
@@ -1190,13 +1198,27 @@ $("schools-body")?.addEventListener("click", async e => {
     }
     const schoolId = delBtn.dataset.deleteSchool;
     const schoolName = delBtn.dataset.schoolName;
-    const confirmed = window.confirm(`Deseja realmente excluir a escola "${schoolName}"? Use esta opção apenas para cadastros incorretos sem vínculos ativos.`);
+    const linkedUsersCount = cachedProfiles.filter(p => p.school_id === schoolId).length;
+    const extraMsg = linkedUsersCount > 0
+      ? `\n\nAtenção: existem ${linkedUsersCount} usuário(s) vinculado(s) a esta escola. Eles serão desvinculados (sem apagar a conta) antes da exclusão.`
+      : "";
+    const confirmed = window.confirm(`Deseja realmente excluir a escola "${schoolName}"?${extraMsg}`);
     if (!confirmed) return;
 
     delBtn.disabled = true;
     try {
-      const { error } = await supabase.from("schools").delete().eq("id", schoolId);
+      if (linkedUsersCount > 0) {
+        await unlinkProfilesFromSchool(schoolId);
+      }
+
+      let { error } = await supabase.from("schools").delete().eq("id", schoolId);
+      if (error?.code === "23503" && String(error.message || "").includes("profiles_school_id_fkey")) {
+        await unlinkProfilesFromSchool(schoolId);
+        const retry = await supabase.from("schools").delete().eq("id", schoolId);
+        error = retry.error;
+      }
       if (error) throw error;
+
       if (selectedSchoolId === schoolId) {
         selectedSchoolId = "";
         if ($("secretaria-school-search")) $("secretaria-school-search").value = "";
@@ -1204,12 +1226,20 @@ $("schools-body")?.addEventListener("click", async e => {
       }
       cachedCensus = cachedCensus.filter(c => c.school_id !== schoolId);
       saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
-      notice("Escola removida com sucesso.");
+      notice(
+        linkedUsersCount > 0
+          ? `Escola "${schoolName}" removida e ${linkedUsersCount} usuário(s) desvinculado(s) com sucesso.`
+          : `Escola "${schoolName}" removida com sucesso.`
+      );
       await loadAll();
     } catch (err) {
       const detail = formatSupabaseError(err);
       console.error("Erro ao excluir escola:", detail, err);
-      notice(`Não foi possível excluir a escola (${detail}).`, true);
+      if (err?.code === "23503") {
+        notice("Não foi possível excluir a escola porque existem registros vinculados (alunos, turmas ou usuários). Remova ou desvincule esses registros primeiro.", true);
+      } else {
+        notice(`Não foi possível excluir a escola (${detail}).`, true);
+      }
       delBtn.disabled = false;
     }
     return;
