@@ -87,6 +87,13 @@ function isPcdStudent(student) {
   return val === "true" || val === "sim" || val === "1";
 }
 
+function usesTransport(enrollment) {
+  if (!enrollment) return false;
+  if (enrollment.uses_school_transport === true) return true;
+  const val = String(enrollment.uses_school_transport || "").trim().toLowerCase();
+  return val === "true" || val === "sim" || val === "1";
+}
+
 function normalizeCpf(value) {
   return String(value || "").replace(/\D/g, "");
 }
@@ -714,11 +721,12 @@ function renderStudents(rows = getScopedStudents()) {
       <td>${escapeHtml(s.full_name)}</td>
       <td>${escapeHtml(formatCpf(s.cpf))}</td>
       <td>${escapeHtml(s.birth_date || "—")}</td>
+      <td>${escapeHtml(s.race_color || "Não declarada")}</td>
       <td>${isPcdStudent(s) ? "Sim" : "Não"}</td>
       <td>${escapeHtml(s.guardian_name || "—")}</td>
       <td>${escapeHtml(s.schools?.name || "—")}</td>
     </tr>`
-  ).join("") || '<tr><td colspan="6">Nenhum aluno cadastrado.</td></tr>';
+  ).join("") || '<tr><td colspan="7">Nenhum aluno cadastrado.</td></tr>';
 }
 
 function formatSchedule(startTime, endTime) {
@@ -810,15 +818,17 @@ function renderEnrollments(rows = getScopedEnrollments()) {
     const stu = e.students || studentById.get(e.student_id);
     const pcdLabel = isPcdStudent(stu) ? "Sim" : "Não";
     const classType = isAeeClass(cls) ? "AEE" : "Regular";
+    const transportLabel = usesTransport(e) ? "Sim" : "Não";
     return `<tr>
       <td>${escapeHtml(stu?.full_name || "—")}</td>
       <td>${pcdLabel}</td>
       <td>${escapeHtml(cls?.name || "—")}</td>
       <td>${classType}</td>
+      <td>${transportLabel}</td>
       <td>${e.school_year}</td>
       <td>${escapeHtml(e.status)}</td>
     </tr>`;
-  }).join("") || '<tr><td colspan="6">Nenhuma matrícula cadastrada.</td></tr>';
+  }).join("") || '<tr><td colspan="7">Nenhuma matrícula cadastrada.</td></tr>';
 }
 
 function renderUsers() {
@@ -1239,7 +1249,9 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
       if (error) throw error;
       form.reset();
       if (form.elements["curriculum_offer"]) form.elements["curriculum_offer"].value = "Comum";
+      if (form.elements["race_color"]) form.elements["race_color"].value = "Não declarada";
       if (form.elements["is_pcd"]) form.elements["is_pcd"].value = "false";
+      if (form.elements["uses_school_transport"]) form.elements["uses_school_transport"].value = "false";
       document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
       if ($('input[name="census_year"]')) $('input[name="census_year"]').value = new Date().getFullYear();
       const effectiveId = getEffectiveSchoolId();
@@ -1295,6 +1307,7 @@ insertForm(
   x => ({
     ...x,
     cpf: validateAndNormalizeCpf(x.cpf, "CPF do aluno").cpf,
+    race_color: String(x.race_color || "Não declarada").trim() || "Não declarada",
     is_pcd: x.is_pcd === "true" || x.is_pcd === true,
     school_id: isSecretaria() ? x.school_id : getEffectiveSchoolId(),
     birth_date: x.birth_date || null,
@@ -1391,6 +1404,7 @@ $("enrollment-form")?.addEventListener("submit", async e => {
   const studentId = raw.student_id;
   const classId = raw.class_id;
   const schoolYear = Number(raw.school_year);
+  const usesSchoolTransport = raw.uses_school_transport === "true" || raw.uses_school_transport === true;
   const status = raw.status || "ativa";
 
   const allowedStudents = new Set(getScopedStudents().map(s => s.id));
@@ -1434,11 +1448,15 @@ $("enrollment-form")?.addEventListener("submit", async e => {
       student_id: studentId,
       class_id: classId,
       school_year: schoolYear,
+      uses_school_transport: usesSchoolTransport,
       status
     });
     if (error) throw error;
 
     e.target.reset();
+    if (e.target.elements["uses_school_transport"]) {
+      e.target.elements["uses_school_transport"].value = "false";
+    }
     document.querySelectorAll('input[name="school_year"]').forEach(x => x.value = new Date().getFullYear());
     notice(targetIsAee ? "Aluno enturmado na turma de AEE com sucesso." : "Aluno enturmado na turma regular com sucesso.");
     await loadAll();
