@@ -12,17 +12,60 @@ const configured =
   Boolean(SUPABASE_URL && SUPABASE_URL.startsWith("https://")) &&
   Boolean(SUPABASE_ANON_KEY && SUPABASE_ANON_KEY.trim().length > 0);
 
-const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+// Armazenamento isolado por aba (sessionStorage) para permitir múltiplos logins simultâneos
+// de perfis diferentes (Secretaria, Gestor, Secretário Escolar, Professor) no mesmo navegador
+// e em dispositivos diferentes sem conflito de sessão.
+const tabSessionStorage = {
+  getItem: (key) => {
+    try {
+      return window.sessionStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key, value) => {
+    try {
+      window.sessionStorage.setItem(key, value);
+    } catch {
+      // ignora restrições de armazenamento privado
+    }
+  },
+  removeItem: (key) => {
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch {
+      // ignora restrições de armazenamento privado
+    }
+  }
+};
+
+const supabase = configured
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storage: tabSessionStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false
+      }
+    })
+  : null;
+
 let currentProfile = null;
 let selectedSchoolId = "";
 let cachedSchools = [], cachedStudents = [], cachedClasses = [], cachedEnrollments = [], cachedProfiles = [], cachedLessons = [];
 let attendanceRows = [];
 let activeLessonDetailSchoolId = null;
+let isSigningOut = false;
 
 const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v2";
 const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
 const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v2";
 const SCHOOL_DRAFT_CENSUS_KEY = "ge_rascunho_censo_escola_v1";
+
+function getScopedStorageKey(baseKey) {
+  const userScope = currentProfile?.id ? `_${currentProfile.id}` : "";
+  return `${baseKey}${userScope}`;
+}
 
 function formatSupabaseError(err) {
   if (!err) return "Erro desconhecido";
@@ -242,7 +285,7 @@ const CENSUS_MODULES = [
 ];
 
 let activeCensusModuleKey = null;
-let draftSchoolCensusModules = loadLocalJson(SCHOOL_DRAFT_CENSUS_KEY, {});
+let draftSchoolCensusModules = {};
 let activeDraftSchoolModuleKey = null;
 
 const defaultCurriculum = [
@@ -254,9 +297,16 @@ const defaultCurriculum = [
   { id: "curr-6", stage: "Ensino Fundamental II (6º ao 9º ano)", subject: "Robótica Educacional e Iniciação Científica", area: "Cultura Digital / Ciências", requirement_type: "complementar_nao_obrigatoria", annual_hours: 80 }
 ];
 
-let cachedCurriculum = loadLocalJson(CURRICULUM_STORAGE_KEY, defaultCurriculum);
-let cachedMonitors = loadLocalJson(MONITORS_STORAGE_KEY, []);
-let cachedCensus = loadLocalJson(CENSUS_STORAGE_KEY, []);
+let cachedCurriculum = [...defaultCurriculum];
+let cachedMonitors = [];
+let cachedCensus = [];
+
+function hydrateUserScopedCache() {
+  draftSchoolCensusModules = loadLocalJson(getScopedStorageKey(SCHOOL_DRAFT_CENSUS_KEY), {});
+  cachedCurriculum = loadLocalJson(getScopedStorageKey(CURRICULUM_STORAGE_KEY), defaultCurriculum);
+  cachedMonitors = loadLocalJson(getScopedStorageKey(MONITORS_STORAGE_KEY), []);
+  cachedCensus = loadLocalJson(getScopedStorageKey(CENSUS_STORAGE_KEY), []);
+}
 
 const $ = (id) => document.getElementById(id);
 const today = new Date().toISOString().slice(0, 10);
@@ -377,12 +427,10 @@ function canManageCurriculumAndMonitors() {
   return isSecretaria() || currentProfile?.role === "gestor";
 }
 
-// Matrículas e Turmas: exclusivas de gestor e secretário escolar vinculados a uma unidade escolar
 function canManageClassesAndEnrollments() {
   return isSchoolUnitProfile() && hasBoundSchoolUnit();
 }
 
-// Diário de classe: exclusivo de gestor, secretário escolar e professor vinculados a uma unidade escolar
 function canAccessDiary() {
   return ["gestor", "secretario_escolar", "professor"].includes(currentProfile?.role) && hasBoundSchoolUnit();
 }
@@ -461,8 +509,28 @@ function updateRoleLabel() {
   }
 }
 
+function resetAppStateOnSignOut() {
+  currentProfile = null;
+  selectedSchoolId = "";
+  cachedSchools = [];
+  cachedStudents = [];
+  cachedClasses = [];
+  cachedEnrollments = [];
+  cachedProfiles = [];
+  cachedLessons = [];
+  attendanceRows = [];
+  activeLessonDetailSchoolId = null;
+  activeCensusModuleKey = null;
+  activeDraftSchoolModuleKey = null;
+
+  $("app-view")?.classList.add("hidden");
+  $("login-view")?.classList.remove("hidden");
+  if ($("login-error")) $("login-error").textContent = "";
+}
+
 function showApp(profile, user) {
   currentProfile = profile;
+  hydrateUserScopedCache();
 
   if (isSecretaria()) {
     selectedSchoolId = "";
@@ -557,6 +625,9 @@ $("login-form")?.addEventListener("submit", async e => {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
+    // Limpa eventual sessão anterior apenas na aba atual antes de autenticar o novo usuário
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: $("email").value.trim(),
       password: $("password").value
@@ -605,11 +676,31 @@ async function loadProfile(user) {
 }
 
 $("logout")?.addEventListener("click", async () => {
-  if (supabase) await supabase.auth.signOut();
-  location.reload();
+  isSigningOut = true;
+  try {
+    if (supabase) {
+      // Encerra somente a sessão local desta aba/dispositivo sem derrubar outros acessos simultâneos
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    }
+  } finally {
+    resetAppStateOnSignOut();
+    isSigningOut = false;
+  }
 });
 
 if (supabase) {
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === "SIGNED_OUT") {
+      if (!isSigningOut && currentProfile) {
+        resetAppStateOnSignOut();
+      }
+      return;
+    }
+    if (event === "TOKEN_REFRESHED" && session?.user && currentProfile && session.user.id === currentProfile.id) {
+      return;
+    }
+  });
+
   supabase.auth.getSession().then(async ({ data, error }) => {
     if (error) {
       await supabase.auth.signOut({ scope: "local" }).catch(() => {});
@@ -768,13 +859,9 @@ function computeSecretariaGeneralReport() {
     s => s.school_id && registeredSchoolIds.has(s.school_id)
   );
 
-  // Matriculados: número geral de alunos de todas as escolas cadastradas
   const matriculadosCount = studentsInRegisteredSchools.length;
-
-  // Total de escolas: quantitativo de escolas cadastradas
   const totalEscolasCount = cachedSchools.length;
 
-  // Profissionais da educação: todos os profissionais cadastrados em todas as escolas cadastradas
   const educationRoles = new Set(["professor", "monitor_complementar", "gestor", "secretario_escolar"]);
   const profissionaisCount = cachedProfiles.filter(p =>
     p.school_id &&
@@ -782,7 +869,6 @@ function computeSecretariaGeneralReport() {
     educationRoles.has(p.role)
   ).length;
 
-  // Alunos únicos nas escolas cadastradas (por CPF quando informado, ou por registro de aluno)
   const uniqueStudentKeys = new Set(
     studentsInRegisteredSchools.map((s, idx) => {
       const cpfDigits = normalizeCpf(s.cpf);
@@ -791,7 +877,6 @@ function computeSecretariaGeneralReport() {
   );
   const alunosUnicosCount = uniqueStudentKeys.size;
 
-  // Matrículas especiais: todos os alunos enturmados em turmas de AEE de todas as escolas cadastradas
   const aeeClassIds = new Set(
     cachedClasses
       .filter(c => c.school_id && registeredSchoolIds.has(c.school_id) && isAeeClass(c))
@@ -811,7 +896,6 @@ function computeSecretariaGeneralReport() {
   }
   const matriculasEspeciaisCount = specialEnrollmentStudentIds.size;
 
-  // Mudanças na matrícula nas escolas cadastradas
   const schoolClassIds = new Set(
     cachedClasses
       .filter(c => c.school_id && registeredSchoolIds.has(c.school_id))
@@ -928,7 +1012,6 @@ function buildSecretariaLessonMetrics() {
   const selectedSchool = $("sec-lessons-school")?.value || "";
 
   const classMap = new Map(cachedClasses.map(c => [c.id, c]));
-  const schoolMap = new Map(cachedSchools.map(s => [s.id, s]));
 
   const targetSchools = selectedSchool
     ? cachedSchools.filter(s => s.id === selectedSchool)
@@ -1295,6 +1378,7 @@ $("class-school")?.addEventListener("change", () => {
 });
 
 async function loadAll() {
+  if (!currentProfile) return;
   try {
     const queries = [
       fetchRows("schools"),
@@ -1346,7 +1430,7 @@ async function loadAll() {
             });
           }
           cachedCensus = Array.from(mergedMap.values());
-          saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
+          saveLocalJson(getScopedStorageKey(CENSUS_STORAGE_KEY), cachedCensus);
         }
       } catch (e) {
         console.warn("Tabela school_census_mappings não lida remotamente:", formatSupabaseError(e));
@@ -1462,7 +1546,7 @@ function saveCurrentDraftModuleFromEditor(showFeedback = false) {
     ...draftSchoolCensusModules,
     [modKey]: modValues
   };
-  saveLocalJson(SCHOOL_DRAFT_CENSUS_KEY, draftSchoolCensusModules);
+  saveLocalJson(getScopedStorageKey(SCHOOL_DRAFT_CENSUS_KEY), draftSchoolCensusModules);
   renderSchoolFormCensusGrid();
 
   if (showFeedback) {
@@ -1625,7 +1709,7 @@ $("school-form")?.addEventListener("submit", async e => {
     }
 
     draftSchoolCensusModules = {};
-    saveLocalJson(SCHOOL_DRAFT_CENSUS_KEY, {});
+    saveLocalJson(getScopedStorageKey(SCHOOL_DRAFT_CENSUS_KEY), {});
     activeDraftSchoolModuleKey = null;
     $("school-census-module-editor")?.classList.add("hidden");
     renderSchoolFormCensusGrid();
@@ -1713,7 +1797,7 @@ $("schools-body")?.addEventListener("click", async e => {
         updateRoleLabel();
       }
       cachedCensus = cachedCensus.filter(c => c.school_id !== schoolId);
-      saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
+      saveLocalJson(getScopedStorageKey(CENSUS_STORAGE_KEY), cachedCensus);
       notice(
         linkedUsersCount > 0
           ? `Escola "${schoolName}" removida e ${linkedUsersCount} usuário(s) desvinculado(s) com sucesso.`
@@ -1953,7 +2037,7 @@ $("curriculum-form")?.addEventListener("submit", e => {
     annual_hours: Number(data.annual_hours) || 0
   };
   cachedCurriculum = [newItem, ...cachedCurriculum];
-  saveLocalJson(CURRICULUM_STORAGE_KEY, cachedCurriculum);
+  saveLocalJson(getScopedStorageKey(CURRICULUM_STORAGE_KEY), cachedCurriculum);
   e.target.reset();
   if ($("curriculum-stage-select")) $("curriculum-stage-select").value = newItem.stage;
   if ($("curriculum-requirement-select")) $("curriculum-requirement-select").value = requirementType;
@@ -1975,7 +2059,7 @@ $("curriculum-body")?.addEventListener("click", e => {
   }
   const id = btn.dataset.deleteCurriculum;
   cachedCurriculum = cachedCurriculum.filter(x => x.id !== id);
-  saveLocalJson(CURRICULUM_STORAGE_KEY, cachedCurriculum);
+  saveLocalJson(getScopedStorageKey(CURRICULUM_STORAGE_KEY), cachedCurriculum);
   fillMonitorSubjectSelect();
   renderCurriculum();
   notice("Item removido da matriz curricular.");
@@ -2028,7 +2112,7 @@ $("monitor-form")?.addEventListener("submit", e => {
     weekly_hours: Number(data.weekly_hours) || 0
   };
   cachedMonitors = [newMonitor, ...cachedMonitors];
-  saveLocalJson(MONITORS_STORAGE_KEY, cachedMonitors);
+  saveLocalJson(getScopedStorageKey(MONITORS_STORAGE_KEY), cachedMonitors);
   e.target.reset();
   if (effectiveId && $("monitor-school")) $("monitor-school").value = effectiveId;
   renderMonitors();
@@ -2044,7 +2128,7 @@ $("monitors-body")?.addEventListener("click", e => {
   }
   const id = btn.dataset.deleteMonitor;
   cachedMonitors = cachedMonitors.filter(x => x.id !== id);
-  saveLocalJson(MONITORS_STORAGE_KEY, cachedMonitors);
+  saveLocalJson(getScopedStorageKey(MONITORS_STORAGE_KEY), cachedMonitors);
   renderMonitors();
   notice("Monitor removido.");
 });
@@ -2387,7 +2471,7 @@ $("census-year-input")?.addEventListener("change", () => {
 
 async function persistCensusEntry(entry) {
   cachedCensus = [entry, ...cachedCensus.filter(x => x.id !== entry.id)];
-  saveLocalJson(CENSUS_STORAGE_KEY, cachedCensus);
+  saveLocalJson(getScopedStorageKey(CENSUS_STORAGE_KEY), cachedCensus);
 
   if (supabase) {
     try {
