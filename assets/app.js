@@ -267,6 +267,10 @@ const roleNames = {
   monitor_complementar: "Monitor de atividade complementar"
 };
 
+function formatCount(value) {
+  return Number(value || 0).toLocaleString("pt-BR");
+}
+
 function generateFourDigitCode(existingList, fieldName) {
   const existingCodes = new Set(
     existingList
@@ -523,6 +527,7 @@ function go(page) {
   }
   if (page === "censo" && canAccessCensus()) renderCensus();
   if (page === "escolas") renderSchoolFormCensusGrid();
+  if (page === "relatorios") renderReportSection();
 }
 
 document.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.page)));
@@ -750,6 +755,111 @@ function getActiveStudentCountForClass(classId) {
   return activeStudentIds.size;
 }
 
+function computeSecretariaGeneralReport() {
+  const registeredSchoolIds = new Set(cachedSchools.map(s => s.id).filter(Boolean));
+  const studentsInRegisteredSchools = cachedStudents.filter(
+    s => s.school_id && registeredSchoolIds.has(s.school_id)
+  );
+
+  // Matriculados: número geral de alunos de todas as escolas cadastradas
+  const matriculadosCount = studentsInRegisteredSchools.length;
+
+  // Total de escolas: quantitativo de escolas cadastradas
+  const totalEscolasCount = cachedSchools.length;
+
+  // Profissionais da educação: todos os profissionais cadastrados em todas as escolas cadastradas
+  const educationRoles = new Set(["professor", "monitor_complementar", "gestor", "secretario_escolar"]);
+  const profissionaisCount = cachedProfiles.filter(p =>
+    p.school_id &&
+    registeredSchoolIds.has(p.school_id) &&
+    educationRoles.has(p.role)
+  ).length;
+
+  // Alunos únicos nas escolas cadastradas (por CPF quando informado, ou por registro de aluno)
+  const uniqueStudentKeys = new Set(
+    studentsInRegisteredSchools.map((s, idx) => {
+      const cpfDigits = normalizeCpf(s.cpf);
+      return cpfDigits || s.id || `stu-${idx}`;
+    })
+  );
+  const alunosUnicosCount = uniqueStudentKeys.size;
+
+  // Matrículas especiais: todos os alunos enturmados em turmas de AEE de todas as escolas cadastradas
+  const aeeClassIds = new Set(
+    cachedClasses
+      .filter(c => c.school_id && registeredSchoolIds.has(c.school_id) && isAeeClass(c))
+      .map(c => c.id)
+  );
+  const studentById = new Map(cachedStudents.map(s => [s.id, s]));
+  const specialEnrollmentStudentIds = new Set();
+
+  for (const en of cachedEnrollments) {
+    if (en.class_id && aeeClassIds.has(en.class_id) && en.student_id && en.status !== "cancelada") {
+      specialEnrollmentStudentIds.add(en.student_id);
+    }
+  }
+  for (const stu of studentsInRegisteredSchools) {
+    if (stu.aee_class_id && aeeClassIds.has(stu.aee_class_id) && stu.id) {
+      specialEnrollmentStudentIds.add(stu.id);
+    }
+  }
+  const matriculasEspeciaisCount = specialEnrollmentStudentIds.size;
+
+  // Mudanças na matrícula nas escolas cadastradas
+  const schoolClassIds = new Set(
+    cachedClasses
+      .filter(c => c.school_id && registeredSchoolIds.has(c.school_id))
+      .map(c => c.id)
+  );
+  const studentSchoolMap = new Map(studentsInRegisteredSchools.map(s => [s.id, s.school_id]));
+  const mudancasMatriculaCount = cachedEnrollments.filter(en => {
+    const inSchool =
+      (en.class_id && schoolClassIds.has(en.class_id)) ||
+      (en.student_id && studentSchoolMap.has(en.student_id));
+    return inSchool && ["transferida", "cancelada"].includes(String(en.status || "").toLowerCase());
+  }).length;
+
+  return {
+    matriculados: matriculadosCount,
+    totalEscolas: totalEscolasCount,
+    profissionais: profissionaisCount,
+    alunosUnicos: alunosUnicosCount,
+    matriculasEspeciais: matriculasEspeciaisCount,
+    mudancasMatricula: mudancasMatriculaCount
+  };
+}
+
+function renderReportSection() {
+  const secView = $("secretaria-report-view");
+  const stdView = $("standard-report-view");
+  const subtitle = $("report-subtitle");
+
+  if (isSecretaria()) {
+    secView?.classList.remove("hidden");
+    stdView?.classList.add("hidden");
+    if (subtitle) {
+      subtitle.textContent = "Números gerais consolidados de todas as escolas cadastradas na rede municipal.";
+    }
+    if ($("secretaria-report-year")) {
+      $("secretaria-report-year").textContent = `Ano de referência: ${new Date().getFullYear()}`;
+    }
+
+    const metrics = computeSecretariaGeneralReport();
+    if ($("sec-report-matriculados")) $("sec-report-matriculados").textContent = formatCount(metrics.matriculados);
+    if ($("sec-report-escolas")) $("sec-report-escolas").textContent = formatCount(metrics.totalEscolas);
+    if ($("sec-report-profissionais")) $("sec-report-profissionais").textContent = formatCount(metrics.profissionais);
+    if ($("sec-report-alunos-unicos")) $("sec-report-alunos-unicos").textContent = formatCount(metrics.alunosUnicos);
+    if ($("sec-report-matriculas-especiais")) $("sec-report-matriculas-especiais").textContent = formatCount(metrics.matriculasEspeciais);
+    if ($("sec-report-mudancas-matricula")) $("sec-report-mudancas-matricula").textContent = formatCount(metrics.mudancasMatricula);
+  } else {
+    secView?.classList.add("hidden");
+    stdView?.classList.remove("hidden");
+    if (subtitle) {
+      subtitle.textContent = "Resumo dos registros aos quais seu perfil tem acesso.";
+    }
+  }
+}
+
 function applySchoolScope() {
   updateRoleLabel();
   updateHomeSchoolCard();
@@ -791,6 +901,7 @@ function applySchoolScope() {
   if ($("report-aee")) $("report-aee").textContent = aeeEnrolledCount;
   if ($("report-pcd")) $("report-pcd").textContent = pcdStudentsCount;
 
+  renderReportSection();
   renderSchools(scopedSchools);
   renderStudents(scopedStudents);
   if (canManageClassesAndEnrollments()) {
@@ -817,7 +928,7 @@ async function fetchRows(table, select = "*") {
 }
 
 async function loadProfiles() {
-  if (!$("users-body")) return;
+  if (!$("users-body") && !isSecretaria()) return;
   try {
     const { data, error } = await supabase
       .from("profiles")
@@ -831,10 +942,15 @@ async function loadProfiles() {
     if (canManageClassesAndEnrollments()) {
       renderClasses(getScopedClasses());
     }
+    if (isSecretaria()) {
+      renderReportSection();
+    }
   } catch (e) {
     console.warn("Não foi possível carregar perfis:", formatSupabaseError(e), e);
     fillSelect("class-teacher", [], x => x.full_name, "Não definido");
-    $("users-body").innerHTML = '<tr><td colspan="5">Não foi possível carregar os usuários. Verifique as permissões da tabela profiles.</td></tr>';
+    if ($("users-body")) {
+      $("users-body").innerHTML = '<tr><td colspan="5">Não foi possível carregar os usuários. Verifique as permissões da tabela profiles.</td></tr>';
+    }
   }
 }
 
