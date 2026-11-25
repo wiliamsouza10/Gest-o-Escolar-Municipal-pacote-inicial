@@ -62,7 +62,25 @@
       <section id="notice" class="notice hidden"></section>
 
       <section id="page-inicio" class="page">
-        <div class="welcome"><div><p class="eyebrow light">GESTÃO INTEGRADA</p><h1>Bem-vindo(a) ao Gestão Escolar</h1><p>Acompanhe as informações da sua unidade ou de toda a rede municipal.</p></div><div class="welcome-icon">✦</div></div>
+        <div class="welcome">
+          <div>
+            <p class="eyebrow light">GESTÃO INTEGRADA</p>
+            <h1>Bem-vindo(a) ao Gestão Escolar</h1>
+            <p id="inicio-school-subtitle">Acompanhe as informações da sua unidade ou de toda a rede municipal.</p>
+          </div>
+          <div id="school-identity-card" style="background:#ffffff;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:230px;box-shadow:0 6px 18px rgba(0,0,0,0.08);">
+            <div style="background:#e3f1dc;color:#35682d;font-weight:700;font-size:0.95rem;padding:10px 14px;border-radius:8px;text-align:center;">
+              ID Escola: <span id="home-school-id">—</span>
+            </div>
+            <div style="background:#dcebf7;color:#235789;font-weight:700;font-size:0.95rem;padding:10px 14px;border-radius:8px;text-align:center;">
+              INEP: <span id="home-school-inep">—</span>
+            </div>
+            <div style="background:#fbf2dc;color:#7a6220;font-weight:700;font-size:0.95rem;padding:10px 14px;border-radius:8px;text-align:center;">
+              Currículo: <span id="home-school-curriculum">—</span>
+            </div>
+          </div>
+        </div>
+
         <div class="stats">
           <article class="stat"><span>Alunos cadastrados</span><strong id="stat-alunos">—</strong><small>Conforme seu nível de acesso</small></article>
           <article class="stat"><span>Matrículas ativas</span><strong id="stat-matriculas">—</strong><small>Ano letivo vigente</small></article>
@@ -78,11 +96,18 @@
       </section>
 
       <section id="page-escolas" class="page hidden">
-        <div class="panel"><div class="panel-head"><div><h3>Unidades escolares</h3><p class="muted">Cadastro das escolas da rede municipal, gestor responsável e código INEP.</p></div></div>
+        <div class="panel"><div class="panel-head"><div><h3>Unidades escolares</h3><p class="muted">Cadastro das escolas da rede municipal, gestor responsável, código INEP e oferta curricular.</p></div></div>
           <form id="school-form" class="form-grid">
             <label>Nome da escola<input name="name" required maxlength="160" placeholder="Ex.: E.M. Monteiro Lobato"></label>
             <label>Gestor da unidade<input name="manager_name" maxlength="160" placeholder="Nome do diretor(a) / gestor(a)"></label>
-            <label>Código INEP<input name="inep_code" maxlength="20" placeholder="Ex.: 35123456"></label>
+            <label>Código INEP<input name="inep_code" maxlength="20" placeholder="Ex.: 29235146"></label>
+            <label>Currículo (Oferta curricular)
+              <select name="curriculum_offer" required>
+                <option value="Comum" selected>Comum</option>
+                <option value="Diversificado">Diversificado</option>
+                <option value="Comum e Diversificado">Comum e Diversificado</option>
+              </select>
+            </label>
             <label>Endereço<input name="address" maxlength="240" placeholder="Rua, número, bairro"></label>
             <label>Telefone<input name="phone" maxlength="30" placeholder="(00) 0000-0000"></label>
             <button class="primary" type="submit">Cadastrar escola</button>
@@ -90,9 +115,9 @@
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Escola</th><th>Gestor</th><th>Código INEP</th><th>Endereço</th><th>Telefone</th><th>Ações</th></tr>
+                <tr><th>ID Escola</th><th>Escola</th><th>Gestor</th><th>Código INEP</th><th>Currículo</th><th>Endereço</th><th>Telefone</th><th>Ações</th></tr>
               </thead>
-              <tbody id="schools-body"><tr><td colspan="6">Carregando...</td></tr></tbody>
+              <tbody id="schools-body"><tr><td colspan="8">Carregando...</td></tr></tbody>
             </table>
           </div>
         </div>
