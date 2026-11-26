@@ -8,12 +8,17 @@ const SUPABASE_URL = "https://xkuypxublyyrevrmaale.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_AK9mLZ12c6fUaltPDtTD2Q_oNfG6sXD";
 const CREATE_USER_FUNCTION = "create-user";
 
+// E-mails autorizados como proprietário do programa (além de profile.role === "owner" / "proprietario")
+const OWNER_EMAILS = [
+  "seu-email-de-dono@exemplo.com"
+];
+
 const configured =
   Boolean(SUPABASE_URL && SUPABASE_URL.startsWith("https://")) &&
   Boolean(SUPABASE_ANON_KEY && SUPABASE_ANON_KEY.trim().length > 0);
 
 // Armazenamento isolado por aba (sessionStorage) para permitir múltiplos logins simultâneos
-// de perfis diferentes (Secretaria, Gestor, Secretário Escolar, Professor) no mesmo navegador
+// de perfis diferentes (Proprietário, Secretaria, Gestor, Secretário Escolar, Professor) no mesmo navegador
 // e em dispositivos diferentes sem conflito de sessão.
 const tabSessionStorage = {
   getItem: (key) => {
@@ -61,10 +66,17 @@ let isSigningOut = false;
 
 const CITIES_STORAGE_KEY = "ge_municipios_cadastrados_v1";
 const SELECTED_CITY_STORAGE_KEY = "ge_municipio_selecionado_v1";
+const LICENSE_REQUESTS_STORAGE_KEY = "ge_solicitacoes_licenca_v1";
 const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v2";
 const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
 const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v2";
 const SCHOOL_DRAFT_CENSUS_KEY = "ge_rascunho_censo_escola_v1";
+
+function isProgramOwner() {
+  const email = String(currentProfile?.email || "").trim().toLowerCase();
+  const role = String(currentProfile?.role || "").trim().toLowerCase();
+  return role === "owner" || role === "proprietario" || (email && OWNER_EMAILS.includes(email));
+}
 
 function getMunicipalityScopePrefix() {
   const muniKey = selectedMunicipality?.id || currentProfile?.municipality_id || "sem_municipio";
@@ -331,6 +343,8 @@ function hydrateUserScopedCache() {
 const $ = (id) => document.getElementById(id);
 const today = new Date().toISOString().slice(0, 10);
 const roleNames = {
+  owner: "Proprietário do Programa",
+  proprietario: "Proprietário do Programa",
   secretaria: "Secretaria de Educação",
   gestor: "Gestor escolar",
   secretario_escolar: "Secretário escolar",
@@ -427,9 +441,19 @@ function saveLocalJson(key, value) {
   }
 }
 
-// --- PORTAL DE CIDADES E ISOLAMENTO MULTI-MUNICÍPIO ---
+// --- PORTAL DE CIDADES, SOLICITAÇÃO DE LICENÇA E CADASTRO EXCLUSIVO DO PROPRIETÁRIO ---
 function getActiveMunicipalityId() {
   return selectedMunicipality?.id || currentProfile?.municipality_id || "";
+}
+
+function syncOwnerCityControls() {
+  const canCreateCity = Boolean(currentProfile && isProgramOwner());
+  document.querySelectorAll("[data-owner-only-city]").forEach(el => {
+    el.classList.toggle("hidden", !canCreateCity);
+  });
+  if (!canCreateCity) {
+    $("city-register-panel")?.classList.add("hidden");
+  }
 }
 
 function updateCityBranding() {
@@ -465,6 +489,7 @@ function updateCityBranding() {
       ? `Bem-vindo(a) ao Gestão Escolar de ${city.name}`
       : "Bem-vindo(a) ao Gestão Escolar";
   }
+  syncOwnerCityControls();
 }
 
 function updateCityPreviewStats() {
@@ -540,7 +565,7 @@ function showCityPortal() {
 function showLoginForSelectedCity() {
   if (!selectedMunicipality?.id) {
     if ($("city-portal-error")) {
-      $("city-portal-error").textContent = "Selecione uma cidade na lista ou cadastre um novo município para continuar.";
+      $("city-portal-error").textContent = "Selecione uma cidade na lista ou solicite a contratação de uma licença para continuar.";
     }
     return;
   }
@@ -573,16 +598,30 @@ $("enter-selected-city-btn")?.addEventListener("click", () => {
 });
 
 function toggleCityRegisterPanel(forceOpen = null) {
+  if (!currentProfile || !isProgramOwner()) {
+    if ($("city-portal-error")) {
+      $("city-portal-error").textContent =
+        "O cadastro de novas cidades é exclusivo do proprietário do programa. Utilize 'Solicitar Contratação de Licença'.";
+    }
+    $("city-register-panel")?.classList.add("hidden");
+    return false;
+  }
   const panel = $("city-register-panel");
-  if (!panel) return;
+  if (!panel) return false;
   const shouldOpen = forceOpen !== null ? forceOpen : panel.classList.contains("hidden");
   panel.classList.toggle("hidden", !shouldOpen);
   if (shouldOpen) {
+    $("license-request-panel")?.classList.add("hidden");
     $("city-name-input")?.focus();
   }
+  return shouldOpen;
 }
 
 $("open-city-register-btn")?.addEventListener("click", () => {
+  if (!currentProfile || !isProgramOwner()) {
+    notice("Apenas o proprietário do programa pode cadastrar cidades. Utilize 'Solicitar Contratação de Licença'.", true);
+    return;
+  }
   showCityPortal();
   toggleCityRegisterPanel(true);
 });
@@ -594,6 +633,14 @@ $("toggle-city-register-btn")?.addEventListener("click", () => {
 $("city-register-form")?.addEventListener("submit", async e => {
   e.preventDefault();
   if ($("city-portal-error")) $("city-portal-error").textContent = "";
+
+  if (!currentProfile || !isProgramOwner()) {
+    if ($("city-portal-error")) {
+      $("city-portal-error").textContent =
+        "Apenas o proprietário do programa pode cadastrar cidades após a contratação da licença.";
+    }
+    return;
+  }
 
   const name = String($("city-name-input")?.value || "").trim();
   const stateUf = String($("city-uf-input")?.value || "").trim().toUpperCase();
@@ -631,11 +678,20 @@ $("city-register-form")?.addEventListener("submit", async e => {
         }, { onConflict: "slug" })
         .select()
         .single();
-      if (!error && data) {
+      if (error) {
+        if ($("city-portal-error")) {
+          $("city-portal-error").textContent = `Não foi possível cadastrar a cidade no banco (${formatSupabaseError(error)}).`;
+        }
+        return;
+      }
+      if (data) {
         cityRecord = { ...data, secretariat_name: secretariatName || data.secretariat_name || null };
       }
     } catch (err) {
-      console.warn("Cadastro de município salvo localmente (verifique políticas de municipalities no Supabase):", formatSupabaseError(err));
+      if ($("city-portal-error")) {
+        $("city-portal-error").textContent = `Erro ao cadastrar cidade (${formatSupabaseError(err)}).`;
+      }
+      return;
     }
   }
 
@@ -648,7 +704,63 @@ $("city-register-form")?.addEventListener("submit", async e => {
   e.target.reset();
   toggleCityRegisterPanel(false);
   renderCitySelect();
-  showLoginForSelectedCity();
+  notice(`Município "${cityRecord.name} - ${cityRecord.state_uf}" cadastrado com sucesso!`);
+});
+
+// Solicitação de contratação de licença (aberta para novos municípios solicitarem ao proprietário)
+$("open-license-request-btn")?.addEventListener("click", () => {
+  $("city-register-panel")?.classList.add("hidden");
+  $("license-request-panel")?.classList.toggle("hidden");
+  $("req-city-name")?.focus();
+});
+
+$("cancel-license-request-btn")?.addEventListener("click", () => {
+  $("license-request-panel")?.classList.add("hidden");
+});
+
+$("license-request-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  const feedback = $("license-request-feedback");
+  if (feedback) feedback.textContent = "";
+
+  const payload = {
+    city_name: String($("req-city-name")?.value || "").trim(),
+    state_uf: String($("req-city-uf")?.value || "").trim().toUpperCase(),
+    ibge_code: String($("req-city-ibge")?.value || "").trim() || null,
+    contact_name: String($("req-contact-name")?.value || "").trim(),
+    contact_email: String($("req-contact-email")?.value || "").trim().toLowerCase(),
+    contact_phone: String($("req-contact-phone")?.value || "").trim() || null,
+    notes: String($("req-notes")?.value || "").trim() || null,
+    status: "pendente"
+  };
+
+  if (!payload.city_name || payload.state_uf.length !== 2 || !payload.contact_name || !payload.contact_email) {
+    if (feedback) {
+      feedback.textContent = "Preencha município, UF (2 letras), responsável e e-mail institucional.";
+    }
+    return;
+  }
+
+  try {
+    if (supabase) {
+      const { error } = await supabase.from("license_requests").insert(payload);
+      if (error) throw error;
+    }
+
+    const localRequests = loadLocalJson(LICENSE_REQUESTS_STORAGE_KEY, []);
+    localRequests.unshift({ id: `req-${Date.now()}`, ...payload, created_at: new Date().toISOString() });
+    saveLocalJson(LICENSE_REQUESTS_STORAGE_KEY, localRequests);
+
+    e.target.reset();
+    if (feedback) {
+      feedback.textContent = `Solicitação de licença enviada para ${payload.city_name}/${payload.state_uf}. O proprietário do programa liberará o município após a contratação.`;
+    }
+  } catch (err) {
+    console.error("Erro ao enviar solicitação de licença:", formatSupabaseError(err));
+    if (feedback) {
+      feedback.textContent = "Não foi possível enviar a solicitação no momento. Tente novamente.";
+    }
+  }
 });
 
 $("back-to-city-portal-from-login")?.addEventListener("click", () => {
@@ -692,7 +804,7 @@ function canAccessCensus() {
 }
 
 function canManageCurriculumAndMonitors() {
-  return isSecretaria() || currentProfile?.role === "gestor";
+  return isSecretaria() || currentProfile?.role === "gestor" || isProgramOwner();
 }
 
 function canManageClassesAndEnrollments() {
@@ -704,7 +816,7 @@ function canAccessDiary() {
 }
 
 function getEffectiveSchoolId() {
-  if (isSecretaria()) return selectedSchoolId || "";
+  if (isSecretaria() || isProgramOwner()) return selectedSchoolId || "";
   return currentProfile?.school_id || "";
 }
 
@@ -736,7 +848,7 @@ function updateHomeSchoolCard() {
   if ($("inicio-school-subtitle")) {
     if (showIdentityCard && activeSchool) {
       $("inicio-school-subtitle").textContent = `Unidade ativa: ${activeSchool.name} · ID ${activeSchool.school_code || "—"} · INEP ${activeSchool.inep_code || "Não informado"}.`;
-    } else if (isSecretaria()) {
+    } else if (isSecretaria() || isProgramOwner()) {
       $("inicio-school-subtitle").textContent = `Acompanhe as informações gerais da rede municipal${selectedMunicipality ? ` de ${selectedMunicipality.name}` : ""} e das unidades escolares.`;
     } else {
       $("inicio-school-subtitle").textContent = "Acompanhe as informações da sua unidade escolar.";
@@ -767,7 +879,11 @@ function formObject(form) {
 function updateRoleLabel() {
   if (!currentProfile) return;
   const activeSchool = getActiveSchool();
-  if (isSecretaria()) {
+  if (isProgramOwner()) {
+    $("user-role").textContent = activeSchool
+      ? `Proprietário · ${activeSchool.name}`
+      : `Proprietário do Programa${selectedMunicipality ? ` · ${selectedMunicipality.name}` : ""}`;
+  } else if (isSecretaria()) {
     $("user-role").textContent = activeSchool
       ? `Secretaria · ${activeSchool.name}`
       : "Secretaria de Educação · Rede Municipal";
@@ -790,6 +906,7 @@ function resetAppStateOnSignOut() {
   activeLessonDetailSchoolId = null;
   activeCensusModuleKey = null;
   activeDraftSchoolModuleKey = null;
+  syncOwnerCityControls();
 
   $("app-view")?.classList.add("hidden");
   if (selectedMunicipality?.id) {
@@ -802,42 +919,47 @@ function resetAppStateOnSignOut() {
 }
 
 function showApp(profile, user) {
-  currentProfile = profile;
-  if (profile.municipality_id) {
-    const matchedCity = cachedMunicipalities.find(m => m.id === profile.municipality_id);
+  currentProfile = {
+    ...profile,
+    email: profile.email || user?.email || ""
+  };
+
+  if (!isProgramOwner() && currentProfile.municipality_id) {
+    const matchedCity = cachedMunicipalities.find(m => m.id === currentProfile.municipality_id);
     if (matchedCity) {
       selectedMunicipality = matchedCity;
       saveLocalJson(SELECTED_CITY_STORAGE_KEY, matchedCity);
-    } else if (!selectedMunicipality || selectedMunicipality.id !== profile.municipality_id) {
+    } else if (!selectedMunicipality || selectedMunicipality.id !== currentProfile.municipality_id) {
       selectedMunicipality = {
-        id: profile.municipality_id,
+        id: currentProfile.municipality_id,
         name: "Município Vinculado",
         state_uf: "BR",
-        slug: `municipio-${profile.municipality_id.slice(0, 8)}`
+        slug: `municipio-${currentProfile.municipality_id.slice(0, 8)}`
       };
     }
   }
   updateCityBranding();
   hydrateUserScopedCache();
 
-  if (isSecretaria()) {
+  if (isSecretaria() || isProgramOwner()) {
     selectedSchoolId = "";
   } else {
-    selectedSchoolId = profile.school_id || "";
+    selectedSchoolId = currentProfile.school_id || "";
   }
 
   $("city-portal-view")?.classList.add("hidden");
   $("login-view").classList.add("hidden");
   $("app-view").classList.remove("hidden");
-  $("user-name").textContent = profile.full_name || user.email;
+  $("user-name").textContent = currentProfile.full_name || user.email;
   updateRoleLabel();
-  $("avatar").textContent = (profile.full_name || user.email).charAt(0).toUpperCase();
+  $("avatar").textContent = (currentProfile.full_name || user.email).charAt(0).toUpperCase();
   document.querySelectorAll("[data-roles]").forEach(el => {
     const roles = el.dataset.roles.split(",");
-    el.classList.toggle("hidden", !roles.includes(profile.role));
+    const allowed = roles.includes(currentProfile.role) || (isProgramOwner() && roles.includes("secretaria"));
+    el.classList.toggle("hidden", !allowed);
   });
 
-  if (!isSecretaria() && !profile.school_id) {
+  if (!isSecretaria() && !isProgramOwner() && !currentProfile.school_id) {
     notice("Seu perfil ainda não possui uma escola vinculada na tabela de perfis. Solicite à Secretaria de Educação o vínculo da unidade.", true);
   }
 
@@ -886,7 +1008,7 @@ function go(page) {
   if (page === "censo" && canAccessCensus()) renderCensus();
   if (page === "escolas") renderSchoolFormCensusGrid();
   if (page === "relatorios") {
-    if (isSecretaria()) {
+    if (isSecretaria() || isProgramOwner()) {
       initSecretariaLessonMonitoringControls();
       loadSecretariaLessonsMonitorData();
     }
@@ -911,7 +1033,7 @@ $("login-form")?.addEventListener("submit", async e => {
   if (!await requireConfig()) return;
 
   if (!selectedMunicipality?.id) {
-    $("login-error").textContent = "Selecione ou cadastre um município antes de fazer login.";
+    $("login-error").textContent = "Selecione um município na tela inicial antes de fazer login.";
     return;
   }
 
@@ -956,18 +1078,32 @@ async function loadProfile(user) {
       return;
     }
 
-    if (!data) {
+    const emailLower = String(user.email || "").trim().toLowerCase();
+    const isOwnerLogin =
+      OWNER_EMAILS.includes(emailLower) ||
+      ["owner", "proprietario"].includes(String(data?.role || "").trim().toLowerCase());
+
+    if (!data && !isOwnerLogin) {
       $("login-error").textContent = "Usuário autenticado, mas sem perfil institucional na tabela profiles. Solicite ao administrador a liberação do acesso.";
       return;
     }
 
-    if (selectedMunicipality?.id && data.municipality_id && data.municipality_id !== selectedMunicipality.id) {
+    const effectiveProfile = data || {
+      id: user.id,
+      full_name: user.email,
+      email: user.email,
+      role: "owner",
+      municipality_id: selectedMunicipality?.id || null,
+      school_id: null
+    };
+
+    if (!isOwnerLogin && selectedMunicipality?.id && effectiveProfile.municipality_id && effectiveProfile.municipality_id !== selectedMunicipality.id) {
       await supabase.auth.signOut({ scope: "local" }).catch(() => {});
       $("login-error").textContent = `Este usuário pertence a outro município e não pode acessar ${selectedMunicipality.name}.`;
       return;
     }
 
-    showApp(data, user);
+    showApp(effectiveProfile, user);
   } catch (err) {
     console.error("Falha inesperada em loadProfile:", formatSupabaseError(err), err);
     $("login-error").textContent = "Erro inesperado ao carregar o perfil institucional.";
@@ -1021,7 +1157,7 @@ if (supabase) {
   loadMunicipalities().then(() => showCityPortal());
 }
 
-// --- DIRECIONAMENTO POR NOME DA ESCOLA, ID OU CÓDIGO INEP (SECRETARIA) ---
+// --- DIRECIONAMENTO POR NOME DA ESCOLA, ID OU CÓDIGO INEP (SECRETARIA / PROPRIETÁRIO) ---
 function formatSchoolOption(school) {
   const idPart = school.school_code ? `ID ${school.school_code}` : "";
   const inepPart = school.inep_code ? `INEP ${school.inep_code}` : "";
@@ -1058,7 +1194,7 @@ function findSchoolByNameOrInep(term) {
 }
 
 function setActiveSchool(school, redirectToPanel = true) {
-  if (!isSecretaria()) return;
+  if (!isSecretaria() && !isProgramOwner()) return;
   selectedSchoolId = school ? school.id : "";
   const searchInput = $("secretaria-school-search");
   if (searchInput) {
@@ -1076,7 +1212,7 @@ function setActiveSchool(school, redirectToPanel = true) {
 }
 
 $("secretaria-school-search")?.addEventListener("change", e => {
-  if (!isSecretaria()) return;
+  if (!isSecretaria() && !isProgramOwner()) return;
   const raw = e.target.value.trim();
   if (!raw) {
     setActiveSchool(null, false);
@@ -1091,7 +1227,7 @@ $("secretaria-school-search")?.addEventListener("change", e => {
 });
 
 $("secretaria-clear-school")?.addEventListener("click", () => {
-  if (!isSecretaria()) return;
+  if (!isSecretaria() && !isProgramOwner()) return;
   setActiveSchool(null, false);
 });
 
@@ -1101,7 +1237,7 @@ function getScopedSchools() {
     ? cachedSchools.filter(s => !s.municipality_id || s.municipality_id === muniId)
     : cachedSchools;
 
-  if (isSecretaria()) {
+  if (isSecretaria() || isProgramOwner()) {
     return selectedSchoolId
       ? muniSchools.filter(s => s.id === selectedSchoolId)
       : muniSchools;
@@ -1117,7 +1253,7 @@ function getScopedStudents() {
     ? cachedStudents.filter(s => !s.municipality_id || s.municipality_id === muniId)
     : cachedStudents;
 
-  if (isSecretaria()) {
+  if (isSecretaria() || isProgramOwner()) {
     return selectedSchoolId
       ? muniStudents.filter(s => s.school_id === selectedSchoolId)
       : muniStudents;
@@ -1133,7 +1269,7 @@ function getScopedClasses() {
     ? cachedClasses.filter(c => !c.municipality_id || c.municipality_id === muniId)
     : cachedClasses;
 
-  if (isSecretaria()) {
+  if (isSecretaria() || isProgramOwner()) {
     return selectedSchoolId
       ? muniClasses.filter(c => c.school_id === selectedSchoolId)
       : muniClasses;
@@ -1152,7 +1288,7 @@ function getScopedEnrollments() {
   const scopedStudents = getScopedStudents();
   const scopedClasses = getScopedClasses();
 
-  if (isSecretaria() && !selectedSchoolId) {
+  if ((isSecretaria() || isProgramOwner()) && !selectedSchoolId) {
     return muniEnrollments;
   }
 
@@ -1250,7 +1386,7 @@ function computeSecretariaGeneralReport() {
   };
 }
 
-// --- ANÁLISE DE DADOS — REGISTROS DE AULAS (APENAS PERFIL SECRETARIA) ---
+// --- ANÁLISE DE DADOS — REGISTROS DE AULAS (SECRETARIA / PROPRIETÁRIO) ---
 function parseLessonDateToMs(dateStr) {
   if (!dateStr) return null;
   const clean = String(dateStr).trim();
@@ -1280,7 +1416,7 @@ function getDaysSinceMs(ms) {
 }
 
 function initSecretariaLessonMonitoringControls() {
-  if (!isSecretaria()) return;
+  if (!isSecretaria() && !isProgramOwner()) return;
   const yearSelect = $("sec-lessons-year");
   const schoolSelect = $("sec-lessons-school");
 
@@ -1323,7 +1459,7 @@ function initSecretariaLessonMonitoringControls() {
 }
 
 async function loadSecretariaLessonsMonitorData() {
-  if (!isSecretaria() || !supabase) return;
+  if ((!isSecretaria() && !isProgramOwner()) || !supabase) return;
   try {
     let query = supabase
       .from("lessons")
@@ -1482,7 +1618,7 @@ function renderSecretariaSchoolLessonDetail(metrics) {
 }
 
 function renderSecretariaLessonsMonitor() {
-  if (!isSecretaria() || !$("sec-lessons-body")) return;
+  if ((!isSecretaria() && !isProgramOwner()) || !$("sec-lessons-body")) return;
   initSecretariaLessonMonitoringControls();
 
   const metrics = buildSecretariaLessonMetrics();
@@ -1541,30 +1677,30 @@ function renderSecretariaLessonsMonitor() {
 }
 
 $("sec-lessons-year")?.addEventListener("change", () => {
-  if (!isSecretaria()) return;
+  if (!isSecretaria() && !isProgramOwner()) return;
   renderSecretariaLessonsMonitor();
 });
 
 $("sec-lessons-school")?.addEventListener("change", () => {
-  if (!isSecretaria()) return;
+  if (!isSecretaria() && !isProgramOwner()) return;
   activeLessonDetailSchoolId = null;
   renderSecretariaLessonsMonitor();
 });
 
 $("sec-lessons-refresh")?.addEventListener("click", async () => {
-  if (!isSecretaria()) return;
+  if (!isSecretaria() && !isProgramOwner()) return;
   await loadSecretariaLessonsMonitorData();
   notice("Monitoramento de registros de aulas atualizado.");
 });
 
 $("sec-lessons-print")?.addEventListener("click", () => {
-  if (!isSecretaria()) return;
+  if (!isSecretaria() && !isProgramOwner()) return;
   window.print();
 });
 
 $("sec-lessons-body")?.addEventListener("click", e => {
   const btn = e.target.closest("[data-view-school-classes]");
-  if (!btn || !isSecretaria()) return;
+  if (!btn || (!isSecretaria() && !isProgramOwner())) return;
   activeLessonDetailSchoolId = btn.dataset.viewSchoolClasses;
   renderSecretariaSchoolLessonDetail(buildSecretariaLessonMetrics());
 });
@@ -1579,7 +1715,7 @@ function renderReportSection() {
   const stdView = $("standard-report-view");
   const subtitle = $("report-subtitle");
 
-  if (isSecretaria()) {
+  if (isSecretaria() || isProgramOwner()) {
     secView?.classList.remove("hidden");
     stdView?.classList.add("hidden");
     if (subtitle) {
@@ -1679,7 +1815,7 @@ async function fetchRows(table, select = "*") {
 }
 
 async function loadProfiles() {
-  if (!$("users-body") && !isSecretaria()) return;
+  if (!$("users-body") && !isSecretaria() && !isProgramOwner()) return;
   try {
     let query = supabase
       .from("profiles")
@@ -1696,7 +1832,7 @@ async function loadProfiles() {
     if (canManageClassesAndEnrollments()) {
       renderClasses(getScopedClasses());
     }
-    if (isSecretaria()) {
+    if (isSecretaria() || isProgramOwner()) {
       renderReportSection();
     }
   } catch (e) {
@@ -1709,7 +1845,7 @@ async function loadProfiles() {
 }
 
 function fillTeacherSelect() {
-  const formSchoolId = isSecretaria() ? ($("class-school")?.value || selectedSchoolId) : getEffectiveSchoolId();
+  const formSchoolId = (isSecretaria() || isProgramOwner()) ? ($("class-school")?.value || selectedSchoolId) : getEffectiveSchoolId();
   const teachers = getScopedTeachers(formSchoolId);
   fillSelect("class-teacher", teachers, x => x.full_name || "Professor sem nome", "Não definido");
 }
@@ -1728,7 +1864,7 @@ async function loadAll() {
       fetchRows("classes", "*, schools(name)"),
       fetchRows("enrollments", "*, students(full_name, is_pcd), classes(name, aee_service, modality)")
     ];
-    if (isSecretaria()) {
+    if (isSecretaria() || isProgramOwner()) {
       let lessonsQuery = supabase
         .from("lessons")
         .select("id,municipality_id,class_id,lesson_date,subject,content,classes(id,name,school_id,school_year,grade_level,shift)");
@@ -1749,7 +1885,7 @@ async function loadAll() {
     cachedStudents = students;
     cachedClasses = classes;
     cachedEnrollments = enrollments;
-    if (isSecretaria()) {
+    if (isSecretaria() || isProgramOwner()) {
       cachedLessons = secretariaLessons;
     }
 
@@ -1813,14 +1949,14 @@ function formatClassLabel(c) {
 
 function fillSelects(scopedStudents = getScopedStudents(), scopedClasses = getScopedClasses()) {
   const effectiveId = getEffectiveSchoolId();
-  const availableSchools = isSecretaria()
+  const availableSchools = (isSecretaria() || isProgramOwner())
     ? getScopedSchools()
     : getScopedSchools().filter(s => s.id === effectiveId);
 
   fillSelect("student-school", availableSchools, x => x.name);
   fillSelect("class-school", availableSchools, x => x.name);
   fillSelect("user-school", getScopedSchools(), x => x.name, "Rede / Não vinculada");
-  fillSelect("monitor-school", availableSchools, x => x.name, isSecretaria() ? "Rede / Todas as escolas" : "Selecione a escola");
+  fillSelect("monitor-school", availableSchools, x => x.name, (isSecretaria() || isProgramOwner()) ? "Rede / Todas as escolas" : "Selecione a escola");
   fillSelect("census-school", availableSchools, x => formatSchoolOption(x), "Selecione a escola");
   fillSelect("enrollment-student", scopedStudents, x => `${x.full_name}${isPcdStudent(x) ? " (PcD)" : ""}`);
   fillSelect("enrollment-class", scopedClasses, x => formatClassLabel(x));
@@ -1983,7 +2119,7 @@ $("school-census-cancel-module")?.addEventListener("click", () => {
 
 $("school-form")?.addEventListener("submit", async e => {
   e.preventDefault();
-  if (!isSecretaria()) {
+  if (!isSecretaria() && !isProgramOwner()) {
     notice("Apenas o perfil Secretaria de Educação pode cadastrar escolas.", true);
     return;
   }
@@ -2086,11 +2222,11 @@ function renderSchools(visibleSchools = getScopedSchools()) {
   if (!$("schools-body")) return;
 
   $("schools-body").innerHTML = visibleSchools.map(s => {
-    const isSelected = isSecretaria() && s.id === selectedSchoolId;
-    const deleteBtn = isSecretaria()
+    const isSelected = (isSecretaria() || isProgramOwner()) && s.id === selectedSchoolId;
+    const deleteBtn = (isSecretaria() || isProgramOwner())
       ? `<button type="button" class="secondary small" data-delete-school="${escapeHtml(s.id)}" data-school-name="${escapeHtml(s.name)}">Excluir</button>`
       : `<span class="muted small">—</span>`;
-    return `<tr data-select-school="${escapeHtml(s.id)}" style="${isSecretaria() ? "cursor:pointer;" : ""}${isSelected ? "background:#eef5ff;font-weight:600;" : ""}">
+    return `<tr data-select-school="${escapeHtml(s.id)}" style="${(isSecretaria() || isProgramOwner()) ? "cursor:pointer;" : ""}${isSelected ? "background:#eef5ff;font-weight:600;" : ""}">
       <td>${escapeHtml(s.school_code || "—")}</td>
       <td>${escapeHtml(s.name)}${isSelected ? " (Selecionada)" : ""}</td>
       <td>${escapeHtml(s.manager_name || "—")}</td>
@@ -2115,7 +2251,7 @@ $("schools-body")?.addEventListener("click", async e => {
   const delBtn = e.target.closest("[data-delete-school]");
   if (delBtn) {
     e.stopPropagation();
-    if (!isSecretaria()) {
+    if (!isSecretaria() && !isProgramOwner()) {
       notice("Apenas o perfil Secretaria de Educação pode excluir escolas.", true);
       return;
     }
@@ -2168,7 +2304,7 @@ $("schools-body")?.addEventListener("click", async e => {
     return;
   }
 
-  if (!isSecretaria()) return;
+  if (!isSecretaria() && !isProgramOwner()) return;
   const row = e.target.closest("[data-select-school]");
   if (!row) return;
   const school = cachedSchools.find(s => s.id === row.dataset.selectSchool);
@@ -2462,7 +2598,7 @@ $("monitor-form")?.addEventListener("submit", e => {
     monitor_name: String(data.monitor_name || "").trim(),
     subject: String(data.subject || "").trim(),
     stage: data.stage,
-    school_id: isSecretaria() ? (data.school_id || null) : effectiveId,
+    school_id: (isSecretaria() || isProgramOwner()) ? (data.school_id || null) : effectiveId,
     weekly_hours: Number(data.weekly_hours) || 0
   };
   cachedMonitors = [newMonitor, ...cachedMonitors];
@@ -3011,7 +3147,7 @@ async function callUserFunction(payload) {
 $("users-body")?.addEventListener("click", async e => {
   const btn = e.target.closest("[data-delete-user]");
   if (!btn) return;
-  if (!isSecretaria()) {
+  if (!isSecretaria() && !isProgramOwner()) {
     notice("Apenas o perfil Secretaria de Educação pode excluir usuários.", true);
     return;
   }
@@ -3037,7 +3173,7 @@ const userForm = $("user-form");
 if (userForm) {
   userForm.addEventListener("submit", async e => {
     e.preventDefault();
-    if (!isSecretaria()) {
+    if (!isSecretaria() && !isProgramOwner()) {
       notice("Apenas o perfil Secretaria de Educação pode cadastrar novos usuários.", true);
       return;
     }
@@ -3173,7 +3309,7 @@ insertForm(
     cpf: validateAndNormalizeCpf(x.cpf, "CPF do aluno").cpf,
     race_color: String(x.race_color || "Não declarada").trim() || "Não declarada",
     is_pcd: x.is_pcd === "true" || x.is_pcd === true,
-    school_id: isSecretaria() ? x.school_id : getEffectiveSchoolId(),
+    school_id: (isSecretaria() || isProgramOwner()) ? x.school_id : getEffectiveSchoolId(),
     birth_date: x.birth_date || null,
     guardian_name: x.guardian_name || null,
     guardian_phone: x.guardian_phone || null,
