@@ -110,7 +110,7 @@
           <div class="panel-head">
             <div>
               <h3>Licenciamento de Cidades (Área do Proprietário)</h3>
-              <p class="muted">Cadastre os municípios autorizados a utilizar o sistema e controle a vigência de suas licenças.</p>
+              <p class="muted">Cadastre os municípios autorizados a utilizar o sistema, defina a senha inicial de acesso e controle a vigência das licenças.</p>
             </div>
           </div>
 
@@ -146,6 +146,9 @@
             </label>
             <label>E-mail do Administrador (Secretaria)
               <input name="admin_email" type="email" required maxlength="160" placeholder="educacao@municipio.gov.br">
+            </label>
+            <label>Senha para login (Administrador)
+              <input name="admin_password" type="password" autocomplete="new-password" required minlength="6" maxlength="128" placeholder="Mínimo 6 caracteres">
             </label>
             <label>Responsável / Contato
               <input name="contact_name" maxlength="160" placeholder="Nome do Secretário(a) ou TI">
