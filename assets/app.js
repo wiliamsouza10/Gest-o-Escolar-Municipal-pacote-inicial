@@ -657,6 +657,10 @@ function showApp(profile, user) {
 }
 
 function go(page) {
+  if (isProprietario()) {
+    page = "cidades";
+  }
+
   if (page === "cidades" && !isProprietario()) {
     notice("Acesso restrito: apenas o e-mail do proprietário do programa pode gerenciar licenças de cidades.", true);
     page = "inicio";
