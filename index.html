@@ -199,31 +199,93 @@
   </section>
 
   <!-- TELA DE LOGIN DO MUNICÍPIO SELECIONADO -->
-  <section id="login-view" class="login-wrap hidden">
-    <div class="card login-card">
-      <p id="login-city-eyebrow" class="eyebrow">MUNICÍPIO SELECIONADO</p>
-      <h1 id="login-city-title" style="margin:4px 0 8px;">Gestão Escolar</h1>
-      <p id="login-city-subtitle" class="muted small">Acesso exclusivo da cidade selecionada.</p>
+  <section id="login-view" class="login-wrap login-screen hidden">
+    <div class="login-hero-brand">
+      <div class="login-brand-mark" aria-hidden="true">
+        <span class="avatar">GE</span>
+      </div>
+      <div class="login-brand-copy">
+        <span class="login-system-tag">Gestão Escolar Municipal</span>
+        <p id="login-city-eyebrow" class="eyebrow">MUNICÍPIO SELECIONADO</p>
+      </div>
+    </div>
 
-      <form id="login-form" class="stack" style="margin-top:16px; display:flex; flex-direction:column; gap:12px;">
-        <label for="email">E-mail
-          <input type="email" id="email" name="email" required autocomplete="username" placeholder="usuario@educacao.gov.br" />
-        </label>
-        <label for="password">Senha
-          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••" />
-        </label>
-        <button type="submit" class="primary">Entrar</button>
-      </form>
+    <div class="login-layout">
+      <!-- COLUNA ESQUERDA: DESTAQUE VISUAL / ILUSTRAÇÃO -->
+      <div class="login-visual-col">
+        <div id="login-visual-panel" class="login-visual-panel" aria-hidden="true">
+          <div class="login-visual-badge">Ambiente Municipal Digital</div>
+          <h2 class="login-visual-title">Acompanhamento escolar simples e integrado</h2>
+          <p class="login-visual-text">
+            Acesso centralizado para gestão de unidades escolares, alunos, matrículas, turmas, diário de classe e indicadores da rede.
+          </p>
+        </div>
+      </div>
 
-      <p id="login-error" class="error small" style="margin-top:10px;"></p>
+      <!-- COLUNA DIREITA: CARD DE LOGIN NO ESTILO DA REFERÊNCIA -->
+      <div class="login-form-col">
+        <div class="card login-card">
+          <header class="login-card-header">
+            <div class="login-institution-block">
+              <span class="login-institution-title">SECRETARIA MUNICIPAL DE EDUCAÇÃO</span>
+              <span id="login-city-badge" class="login-institution-sub">REDE MUNICIPAL</span>
+            </div>
+            <div class="login-emblem-slot" aria-hidden="true">
+              <span class="avatar small-avatar">GE</span>
+            </div>
+          </header>
 
-      <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
-        <button type="button" id="back-to-city-portal-from-login" class="secondary small">
-          ← Trocar de cidade
-        </button>
-        <button type="button" id="go-to-owner-tab-from-login" class="secondary small">
-          Acesso Proprietário
-        </button>
+          <div class="login-card-title-group">
+            <h1 id="login-city-title" class="login-main-title">Sistema de Gerenciamento Escolar</h1>
+            <p id="login-city-subtitle" class="login-sub-title">Acesso exclusivo da cidade selecionada.</p>
+          </div>
+
+          <form id="login-form" class="login-form stack">
+            <div class="login-field-group">
+              <label for="email" class="login-field-label">Usuário:</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                class="login-input"
+                required
+                autocomplete="username"
+                placeholder="Usuário"
+              />
+            </div>
+
+            <div class="login-field-group">
+              <label for="password" class="login-field-label">Senha:</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                class="login-input"
+                required
+                autocomplete="current-password"
+                placeholder="Senha"
+              />
+            </div>
+
+            <div class="login-helper-links">
+              <a href="#recuperar-senha" id="login-forgot-password-link" class="login-link">Esqueceu sua senha?</a>
+              <a href="#primeiro-acesso" id="login-first-access-link" class="login-link">Primeiro acesso?</a>
+            </div>
+
+            <button type="submit" id="login-submit-btn" class="primary login-submit-btn">Entrar</button>
+          </form>
+
+          <p id="login-error" class="error small login-error" role="alert"></p>
+
+          <footer class="login-card-footer">
+            <button type="button" id="back-to-city-portal-from-login" class="secondary small">
+              ← Trocar de cidade
+            </button>
+            <button type="button" id="go-to-owner-tab-from-login" class="secondary small">
+              Acesso Proprietário
+            </button>
+          </footer>
+        </div>
       </div>
     </div>
   </section>
