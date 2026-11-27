@@ -500,7 +500,8 @@ function updateCityBranding() {
   }
 
   if ($("login-city-eyebrow")) $("login-city-eyebrow").textContent = city ? `MUNICÍPIO: ${city.name.toUpperCase()} (${city.state_uf})` : "MUNICÍPIO SELECIONADO";
-  if ($("login-city-title")) $("login-city-title").textContent = city ? `Gestão Escolar · ${city.name}` : "Gestão Escolar";
+  if ($("login-city-badge")) $("login-city-badge").textContent = city ? `${city.name.toUpperCase()} · ${city.state_uf}` : "REDE MUNICIPAL";
+  if ($("login-city-title")) $("login-city-title").textContent = city ? `Gestão Escolar · ${city.name}` : "Sistema de Gerenciamento Escolar";
   if ($("login-city-subtitle")) {
     $("login-city-subtitle").textContent = city
       ? `Acesso exclusivo de ${city.name}/${city.state_uf}. Dados isolados de outros municípios.`
@@ -605,6 +606,20 @@ function showLoginForSelectedCity() {
   $("login-view")?.classList.remove("hidden");
   if ($("login-error")) $("login-error").textContent = "";
 }
+
+$("login-forgot-password-link")?.addEventListener("click", e => {
+  e.preventDefault();
+  if ($("login-error")) {
+    $("login-error").textContent = "Para redefinir sua senha, procure a Secretaria de Educação ou o administrador do sistema.";
+  }
+});
+
+$("login-first-access-link")?.addEventListener("click", e => {
+  e.preventDefault();
+  if ($("login-error")) {
+    $("login-error").textContent = "Primeiro acesso: utilize o e-mail e a senha inicial cadastrados pela Secretaria de Educação.";
+  }
+});
 
 $("city-select")?.addEventListener("change", e => {
   const id = e.target.value;
