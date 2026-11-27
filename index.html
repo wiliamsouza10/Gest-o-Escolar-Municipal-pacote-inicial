@@ -9,7 +9,7 @@
 <body>
   <div id="notice" class="notice hidden"></div>
 
-  <!-- PORTAL INICIAL DE CIDADES (SELEÇÃO + SOLICITAÇÃO DE LICENÇA + CADASTRO EXCLUSIVO DO PROPRIETÁRIO) -->
+  <!-- PORTAL INICIAL DE CIDADES (SELEÇÃO + SOLICITAÇÃO DE LICENÇA + ABA DE ACESSO DO PROPRIETÁRIO) -->
   <section id="city-portal-view" class="city-portal">
     <header class="city-topbar">
       <div class="brand">
@@ -61,90 +61,138 @@
         <p class="eyebrow">AMBIENTE MULTI-MUNICÍPIO</p>
         <h1 style="margin:6px 0 10px;">Gestão <span>ESCOLAR</span> Completa</h1>
         <p class="muted">
-          Selecione a cidade que utiliza o programa para acessar o ambiente exclusivo do município, ou solicite a contratação de uma licença.
+          Selecione a cidade que utiliza o programa para acessar o ambiente exclusivo do município, solicite uma licença ou entre na aba do proprietário para cadastrar cidades.
         </p>
 
-        <div class="card" style="margin-top:18px;">
-          <label for="city-select">Cidades que utilizam o programa
-            <select id="city-select">
-              <option value="">Selecione uma cidade cadastrada...</option>
-            </select>
-          </label>
+        <!-- ABAS DO PORTAL -->
+        <div class="portal-tabs" role="tablist" style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+          <button type="button" id="tab-btn-cities" class="secondary small active" data-portal-tab="cities">
+            Municípios &amp; Licença
+          </button>
+          <button type="button" id="tab-btn-owner" class="secondary small" data-portal-tab="owner">
+            Acesso Proprietário
+          </button>
+        </div>
 
-          <div class="stack" style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
-            <button type="button" id="enter-selected-city-btn" class="primary">
-              Acessar Programa da Cidade
-            </button>
-            <button type="button" id="open-license-request-btn" class="secondary">
-              Solicitar Contratação de Licença
-            </button>
-            <button type="button" id="toggle-city-register-btn" class="secondary hidden" data-owner-only-city>
-              + Cadastrar Nova Cidade
-            </button>
+        <!-- ABA 1: SELEÇÃO DE CIDADE E SOLICITAÇÃO DE LICENÇA -->
+        <div id="portal-tab-cities" class="portal-tab-panel" style="margin-top:12px;">
+          <div class="card">
+            <label for="city-select">Cidades que utilizam o programa
+              <select id="city-select">
+                <option value="">Selecione uma cidade cadastrada...</option>
+              </select>
+            </label>
+
+            <div class="stack" style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
+              <button type="button" id="enter-selected-city-btn" class="primary">
+                Acessar Programa da Cidade
+              </button>
+              <button type="button" id="open-license-request-btn" class="secondary">
+                Solicitar Contratação de Licença
+              </button>
+            </div>
+
+            <p id="city-portal-error" class="error small" style="margin-top:10px;"></p>
           </div>
 
-          <p id="city-portal-error" class="error small" style="margin-top:10px;"></p>
+          <!-- FORMULÁRIO PÚBLICO DE SOLICITAÇÃO DE CONTRATAÇÃO DE LICENÇA -->
+          <div id="license-request-panel" class="card hidden" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Solicitar Contratação de Licença</h3>
+            <p class="muted small">
+              Envie os dados do município para contratação da licença. Após aprovação do proprietário, a cidade será ativada no sistema.
+            </p>
+            <form id="license-request-form" class="grid-2">
+              <label>Município
+                <input type="text" id="req-city-name" required placeholder="Ex.: Santa Inês" />
+              </label>
+              <label>UF
+                <input type="text" id="req-city-uf" maxlength="2" required placeholder="Ex.: BA" />
+              </label>
+              <label>Código IBGE (opcional)
+                <input type="text" id="req-city-ibge" placeholder="Ex.: 2928008" />
+              </label>
+              <label>Nome e cargo do solicitante
+                <input type="text" id="req-contact-name" required placeholder="Ex.: Maria Souza - Secretária" />
+              </label>
+              <label>E-mail institucional
+                <input type="email" id="req-contact-email" required placeholder="contato@educacao.gov.br" />
+              </label>
+              <label>Telefone / WhatsApp
+                <input type="text" id="req-contact-phone" placeholder="(00) 90000-0000" />
+              </label>
+              <label style="grid-column: 1 / -1;">Observações sobre a licença
+                <input type="text" id="req-notes" placeholder="Ex.: Contratação anual para 12 escolas municipais" />
+              </label>
+              <div style="grid-column: 1 / -1; display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="submit" class="primary">Enviar Solicitação de Licença</button>
+                <button type="button" id="cancel-license-request-btn" class="secondary">Cancelar</button>
+              </div>
+            </form>
+            <p id="license-request-feedback" class="small" style="margin-top:10px;"></p>
+          </div>
         </div>
 
-        <!-- FORMULÁRIO PÚBLICO DE SOLICITAÇÃO DE CONTRATAÇÃO DE LICENÇA -->
-        <div id="license-request-panel" class="card hidden" style="margin-top:16px;">
-          <h3 style="margin-top:0;">Solicitar Contratação de Licença</h3>
-          <p class="muted small">
-            Envie os dados do município para contratação da licença. Após aprovação do proprietário, a cidade será ativada no sistema.
-          </p>
-          <form id="license-request-form" class="grid-2">
-            <label>Município
-              <input type="text" id="req-city-name" required placeholder="Ex.: Santa Inês" />
-            </label>
-            <label>UF
-              <input type="text" id="req-city-uf" maxlength="2" required placeholder="Ex.: BA" />
-            </label>
-            <label>Código IBGE (opcional)
-              <input type="text" id="req-city-ibge" placeholder="Ex.: 2928008" />
-            </label>
-            <label>Nome e cargo do solicitante
-              <input type="text" id="req-contact-name" required placeholder="Ex.: Maria Souza - Secretária" />
-            </label>
-            <label>E-mail institucional
-              <input type="email" id="req-contact-email" required placeholder="contato@educacao.gov.br" />
-            </label>
-            <label>Telefone / WhatsApp
-              <input type="text" id="req-contact-phone" placeholder="(00) 90000-0000" />
-            </label>
-            <label style="grid-column: 1 / -1;">Observações sobre a licença
-              <input type="text" id="req-notes" placeholder="Ex.: Contratação anual para 12 escolas municipais" />
-            </label>
-            <div style="grid-column: 1 / -1; display:flex; gap:8px; flex-wrap:wrap;">
-              <button type="submit" class="primary">Enviar Solicitação de Licença</button>
-              <button type="button" id="cancel-license-request-btn" class="secondary">Cancelar</button>
-            </div>
-          </form>
-          <p id="license-request-feedback" class="small" style="margin-top:10px;"></p>
-        </div>
+        <!-- ABA 2: LOGIN E CADASTRO DE CIDADES EXCLUSIVO DO PROPRIETÁRIO DO PROGRAMA -->
+        <div id="portal-tab-owner" class="portal-tab-panel hidden" style="margin-top:12px;">
+          <!-- LOGIN DO PROPRIETÁRIO -->
+          <div id="owner-login-card" class="card">
+            <p class="eyebrow" style="margin:0;">ÁREA DO PROPRIETÁRIO</p>
+            <h3 style="margin:4px 0 6px;">Entrar para Cadastrar Cidades</h3>
+            <p class="muted small">
+              Digite o e-mail e a senha do proprietário do programa para cadastrar municípios que entraram em contato solicitando licença.
+            </p>
+            <form id="owner-login-form" class="stack" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+              <label for="owner-email">E-mail do proprietário
+                <input type="email" id="owner-email" name="owner_email" required autocomplete="username" placeholder="proprietario@programa.com" />
+              </label>
+              <label for="owner-password">Senha
+                <input type="password" id="owner-password" name="owner_password" required autocomplete="current-password" placeholder="••••••••" />
+              </label>
+              <button type="submit" class="primary">Entrar como Proprietário</button>
+            </form>
+            <p id="owner-login-error" class="error small" style="margin-top:10px;"></p>
+          </div>
 
-        <!-- FORMULÁRIO DE CADASTRO DE CIDADE (EXCLUSIVO DO PROPRIETÁRIO DO PROGRAMA) -->
-        <div id="city-register-panel" class="card hidden" data-owner-only-city style="margin-top:16px;">
-          <h3 style="margin-top:0;">Cadastrar Nova Cidade (Proprietário)</h3>
-          <p class="muted small">
-            Acesso exclusivo do proprietário do programa após contratação da licença.
-          </p>
-          <form id="city-register-form" class="grid-2">
-            <label>Nome do município
-              <input type="text" id="city-name-input" required placeholder="Ex.: Santa Inês" />
-            </label>
-            <label>UF
-              <input type="text" id="city-uf-input" maxlength="2" required placeholder="Ex.: BA" />
-            </label>
-            <label>Código IBGE
-              <input type="text" id="city-ibge-input" placeholder="Ex.: 2928008" />
-            </label>
-            <label>Secretaria / Observação
-              <input type="text" id="city-sec-input" placeholder="Ex.: Secretaria Municipal de Educação" />
-            </label>
-            <div style="grid-column: 1 / -1;">
-              <button type="submit" class="primary">Salvar Município</button>
+          <!-- PAINEL DO PROPRIETÁRIO AUTENTICADO (CADASTRO DE CIDADES + SOLICITAÇÕES RECEBIDAS) -->
+          <div id="owner-workspace-card" class="hidden" style="margin-top:12px;">
+            <div class="card">
+              <div class="section-head">
+                <div>
+                  <span class="badge">● Proprietário autenticado</span>
+                  <h3 id="owner-session-label" style="margin:6px 0 2px;">Proprietário do Programa</h3>
+                  <p class="muted small" style="margin:0;">Cadastre novas cidades após contato e contratação.</p>
+                </div>
+                <button type="button" id="owner-logout-btn" class="secondary small">Sair da aba</button>
+              </div>
+
+              <form id="city-register-form" class="grid-2" style="margin-top:14px;">
+                <label>Nome do município
+                  <input type="text" id="city-name-input" required placeholder="Ex.: Santa Inês" />
+                </label>
+                <label>UF
+                  <input type="text" id="city-uf-input" maxlength="2" required placeholder="Ex.: BA" />
+                </label>
+                <label>Código IBGE
+                  <input type="text" id="city-ibge-input" placeholder="Ex.: 2928008" />
+                </label>
+                <label>Secretaria / Observação
+                  <input type="text" id="city-sec-input" placeholder="Ex.: Secretaria Municipal de Educação" />
+                </label>
+                <div style="grid-column: 1 / -1;">
+                  <button type="submit" class="primary">Salvar e Liberar Município</button>
+                </div>
+              </form>
+              <p id="owner-city-feedback" class="small" style="margin-top:10px;"></p>
             </div>
-          </form>
+
+            <div class="card" style="margin-top:14px;">
+              <div class="section-head">
+                <h4 style="margin:0;">Solicitações de cidades recebidas</h4>
+                <button type="button" id="owner-refresh-requests-btn" class="secondary small">Atualizar</button>
+              </div>
+              <div id="owner-license-requests-list" style="margin-top:10px;"></div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -169,9 +217,12 @@
 
       <p id="login-error" class="error small" style="margin-top:10px;"></p>
 
-      <div style="margin-top:14px;">
+      <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
         <button type="button" id="back-to-city-portal-from-login" class="secondary small">
           ← Trocar de cidade
+        </button>
+        <button type="button" id="go-to-owner-tab-from-login" class="secondary small">
+          Acesso Proprietário
         </button>
       </div>
     </div>
