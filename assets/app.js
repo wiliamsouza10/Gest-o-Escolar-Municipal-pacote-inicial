@@ -3593,4 +3593,3 @@ document.querySelectorAll('input[name="school_year"]').forEach(x => {
 if ($('input[name="census_year"]')) {
   $('input[name="census_year"]').value = new Date().getFullYear();
 }
-```[cite: 4]
