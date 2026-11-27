@@ -6,6 +6,97 @@
   <meta name="description" content="Sistema Municipal de Gestão Escolar">
   <title>Gestão Escolar Municipal</title>
   <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    .student-menu-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 12px 0 16px;
+      position: relative;
+      z-index: 20;
+    }
+    .student-menu-wrap {
+      position: relative;
+      display: inline-block;
+    }
+    .student-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      min-width: 255px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.14);
+      padding: 6px 0;
+      z-index: 40;
+    }
+    .student-dropdown.hidden {
+      display: none;
+    }
+    .student-menu-item {
+      position: relative;
+    }
+    .student-menu-btn {
+      width: 100%;
+      background: transparent;
+      border: 0;
+      padding: 9px 14px;
+      text-align: left;
+      font: inherit;
+      font-size: 0.9rem;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .student-menu-btn:hover,
+    .student-menu-item:focus-within > .student-menu-btn {
+      background: #dbeafe;
+      color: #1e3a8a;
+      font-weight: 600;
+    }
+    .student-submenu {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 100%;
+      min-width: 240px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.14);
+      padding: 6px 0;
+      z-index: 50;
+    }
+    .student-menu-item:hover > .student-submenu,
+    .student-menu-item:focus-within > .student-submenu {
+      display: block;
+    }
+    .student-menu-divider {
+      height: 1px;
+      background: #e2e8f0;
+      margin: 5px 0;
+    }
+    @media (max-width: 720px) {
+      .student-submenu {
+        position: static;
+        box-shadow: none;
+        border: 0;
+        border-left: 2px solid #93c5fd;
+        border-radius: 0;
+        margin-left: 14px;
+        padding: 2px 0 6px;
+      }
+      .student-menu-item:hover > .student-submenu,
+      .student-menu-item:focus-within > .student-submenu {
+        display: block;
+      }
+    }
+  </style>
 </head>
 <body>
   <div id="login-view" class="login-wrap">
@@ -61,7 +152,7 @@
         <button class="nav-item active" data-page="inicio" data-roles="secretaria,gestor,secretario_escolar,professor,monitor_complementar">▦ <span>Painel inicial</span></button>
         <button class="nav-item" data-page="cidades" data-roles="proprietario">❖ <span>Licenças e Cidades</span></button>
         <button class="nav-item" data-page="escolas" data-roles="secretaria">⌂ <span>Escolas</span></button>
-        <button class="nav-item" data-page="alunos" data-roles="secretaria,gestor,secretario_escolar">♙ <span>Alunos</span></button>
+        <button class="nav-item" data-page="alunos" data-roles="secretaria,gestor,secretario_escolar">♙ <span>Estudantes</span></button>
         <button class="nav-item" data-page="matriculas" data-roles="gestor,secretario_escolar">▤ <span>Matrículas</span></button>
         <button class="nav-item" data-page="turmas" data-roles="gestor,secretario_escolar">▥ <span>Turmas</span></button>
         <button class="nav-item" data-page="diario" data-roles="gestor,secretario_escolar,professor">▧ <span>Diário de classe</span></button>
@@ -123,7 +214,7 @@
           <div class="panel-head"><div><h3>Acesso rápido</h3><p class="muted">Escolha uma atividade para começar.</p></div></div>
           <div class="quick-grid">
             <button data-goto="cidades" data-roles="proprietario" class="quick"><b>❖</b><strong>Licenciar cidade</strong><span>Gerenciar municípios e licenças</span></button>
-            <button data-goto="alunos" data-roles="secretaria,gestor,secretario_escolar" class="quick"><b>＋</b><strong>Cadastrar aluno</strong><span>Adicionar estudante à base</span></button>
+            <button data-goto="alunos" data-roles="secretaria,gestor,secretario_escolar" class="quick"><b>＋</b><strong>Cadastrar estudante</strong><span>Adicionar estudante à base</span></button>
             <button data-goto="matriculas" data-roles="gestor,secretario_escolar" class="quick"><b>▤</b><strong>Gerenciar matrículas</strong><span>Regular e turma de AEE</span></button>
             <button data-goto="turmas" data-roles="gestor,secretario_escolar" class="quick"><b>▥</b><strong>Gerenciar turmas</strong><span>Criar e organizar turmas</span></button>
             <button data-goto="diario" data-roles="gestor,secretario_escolar,professor" class="quick"><b>▧</b><strong>Abrir diário</strong><span>Frequência e conteúdo</span></button>
@@ -271,34 +362,179 @@
       </section>
 
       <section id="page-alunos" class="page hidden">
-        <div class="panel"><div class="panel-head"><div><h3>Cadastro de alunos</h3><p class="muted">Cadastre somente os dados necessários à finalidade educacional, incluindo Raça/Cor e declaração PcD.</p></div></div>
-          <form id="student-form" class="form-grid">
-            <label>Nome completo<input name="full_name" required maxlength="160"></label>
-            <label>CPF do aluno<input name="cpf" maxlength="14" inputmode="numeric" placeholder="000.000.000-00"></label>
-            <label>Data de nascimento<input name="birth_date" type="date" required></label>
-            <label>Raça/Cor
-              <select name="race_color" required>
-                <option value="Não declarada" selected>Não declarada</option>
-                <option value="Branca">Branca</option>
-                <option value="Preta">Preta</option>
-                <option value="Parda">Parda</option>
-                <option value="Amarela">Amarela</option>
-                <option value="Indígena">Indígena</option>
-              </select>
-            </label>
-            <label>Declarado PcD
-              <select name="is_pcd" required>
-                <option value="false" selected>Não</option>
-                <option value="true">Sim</option>
-              </select>
-            </label>
-            <label>Nome do responsável<input name="guardian_name" maxlength="160"></label>
-            <label>Contato do responsável<input name="guardian_phone" maxlength="30"></label>
-            <label>Escola<select name="school_id" id="student-school" required><option value="">Selecione</option></select></label>
-            <label>Observação administrativa<input name="notes" maxlength="250"></label>
-            <button class="primary" type="submit">Salvar aluno</button>
-          </form>
-          <div class="table-wrap"><table><thead><tr><th>Aluno</th><th>CPF</th><th>Nascimento</th><th>Raça/Cor</th><th>PcD</th><th>Responsável</th><th>Escola</th></tr></thead><tbody id="students-body"><tr><td colspan="7">Carregando...</td></tr></tbody></table></div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Estudantes</h3>
+              <p class="muted" id="student-page-subtitle">Cadastre e gerencie os dados necessários à finalidade educacional, incluindo Raça/Cor e declaração PcD.</p>
+            </div>
+          </div>
+
+          <div class="student-menu-bar" data-roles="gestor,secretario_escolar">
+            <div class="student-menu-wrap">
+              <button type="button" class="primary small" id="student-cascade-toggle" aria-expanded="false" aria-controls="student-cascade-menu">
+                ♙ Estudantes ▾
+              </button>
+              <div class="student-dropdown hidden" id="student-cascade-menu" role="menu">
+                <div class="student-menu-item" role="none">
+                  <button type="button" class="student-menu-btn" data-student-action="cadastrar">
+                    <span>Cadastrar Novo Estudante</span>
+                    <span>▸</span>
+                  </button>
+                </div>
+                <div class="student-menu-item" role="none">
+                  <button type="button" class="student-menu-btn" data-student-action="alteracao_cadastro">
+                    <span>Alteração de Cadastro</span>
+                    <span>▸</span>
+                  </button>
+                </div>
+                <div class="student-menu-item" role="none">
+                  <button type="button" class="student-menu-btn" data-student-action="alterar_vinculo_menu">
+                    <span>Alterar vínculo</span>
+                    <span>▸</span>
+                  </button>
+                  <div class="student-submenu" role="menu">
+                    <button type="button" class="student-menu-btn" data-student-action="transferencia_escolas">
+                      <span>Transferência entre escolas</span>
+                    </button>
+                    <button type="button" class="student-menu-btn" data-student-action="transferencia_rede">
+                      <span>Transferência para outra rede</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="student-menu-divider" role="separator"></div>
+                <div class="student-menu-item" role="none">
+                  <button type="button" class="student-menu-btn" data-student-action="documentos_menu">
+                    <span>Documentos</span>
+                    <span>▸</span>
+                  </button>
+                  <div class="student-submenu" role="menu">
+                    <button type="button" class="student-menu-btn" data-student-action="boletim">
+                      <span>Boletim do aluno</span>
+                    </button>
+                    <button type="button" class="student-menu-btn" data-student-action="historico">
+                      <span>Histórico Escolar</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <span class="muted small" id="student-active-action-badge">Ação ativa: Cadastrar Novo Estudante</span>
+          </div>
+
+          <div id="student-panel-cadastrar">
+            <form id="student-form" class="form-grid">
+              <label>Nome completo<input name="full_name" required maxlength="160"></label>
+              <label>CPF do estudante<input name="cpf" maxlength="14" inputmode="numeric" placeholder="000.000.000-00"></label>
+              <label>Data de nascimento<input name="birth_date" type="date" required></label>
+              <label>Raça/Cor
+                <select name="race_color" required>
+                  <option value="Não declarada" selected>Não declarada</option>
+                  <option value="Branca">Branca</option>
+                  <option value="Preta">Preta</option>
+                  <option value="Parda">Parda</option>
+                  <option value="Amarela">Amarela</option>
+                  <option value="Indígena">Indígena</option>
+                </select>
+              </label>
+              <label>Declarado PcD
+                <select name="is_pcd" required>
+                  <option value="false" selected>Não</option>
+                  <option value="true">Sim</option>
+                </select>
+              </label>
+              <label>Nome do responsável<input name="guardian_name" maxlength="160"></label>
+              <label>Contato do responsável<input name="guardian_phone" maxlength="30"></label>
+              <label>Escola<select name="school_id" id="student-school" required><option value="">Selecione</option></select></label>
+              <label>Observação administrativa<input name="notes" maxlength="250"></label>
+              <button class="primary" type="submit">Salvar estudante</button>
+            </form>
+          </div>
+
+          <div id="student-panel-alteracao" class="panel-sub hidden" data-roles="gestor,secretario_escolar">
+            <h4>Alteração de Cadastro</h4>
+            <p class="muted small">Selecione um estudante para atualizar dados cadastrais, responsável, PcD ou observação.</p>
+            <form id="student-edit-form" class="form-grid">
+              <label style="grid-column: 1 / -1;">Estudante
+                <select name="student_id" id="edit-student-select" required><option value="">Selecione</option></select>
+              </label>
+              <label>Nome completo<input name="full_name" id="edit-student-name" required maxlength="160"></label>
+              <label>CPF do estudante<input name="cpf" id="edit-student-cpf" maxlength="14" inputmode="numeric" placeholder="000.000.000-00"></label>
+              <label>Data de nascimento<input name="birth_date" id="edit-student-birth" type="date" required></label>
+              <label>Raça/Cor
+                <select name="race_color" id="edit-student-race" required>
+                  <option value="Não declarada">Não declarada</option>
+                  <option value="Branca">Branca</option>
+                  <option value="Preta">Preta</option>
+                  <option value="Parda">Parda</option>
+                  <option value="Amarela">Amarela</option>
+                  <option value="Indígena">Indígena</option>
+                </select>
+              </label>
+              <label>Declarado PcD
+                <select name="is_pcd" id="edit-student-pcd" required>
+                  <option value="false">Não</option>
+                  <option value="true">Sim</option>
+                </select>
+              </label>
+              <label>Nome do responsável<input name="guardian_name" id="edit-student-guardian" maxlength="160"></label>
+              <label>Contato do responsável<input name="guardian_phone" id="edit-student-phone" maxlength="30"></label>
+              <label>Observação administrativa<input name="notes" id="edit-student-notes" maxlength="250"></label>
+              <button class="primary" type="submit">Salvar alteração de cadastro</button>
+            </form>
+          </div>
+
+          <div id="student-panel-vinculo" class="panel-sub hidden" data-roles="gestor,secretario_escolar">
+            <h4 id="student-vinculo-title">Alterar vínculo</h4>
+            <p class="muted small" id="student-vinculo-desc">Gerencie transferências do estudante.</p>
+            <form id="student-transfer-form" class="form-grid">
+              <label>Tipo de transferência
+                <select name="transfer_type" id="student-transfer-type" required>
+                  <option value="entre_escolas">Transferência entre escolas</option>
+                  <option value="outra_rede">Transferência para outra rede</option>
+                </select>
+              </label>
+              <label>Estudante
+                <select name="student_id" id="transfer-student-select" required><option value="">Selecione</option></select>
+              </label>
+              <label id="transfer-target-school-wrap">Escola de destino (rede municipal)
+                <select name="target_school_id" id="transfer-target-school"><option value="">Selecione a escola destino</option></select>
+              </label>
+              <label id="transfer-target-network-wrap" class="hidden">Rede / Instituição de destino
+                <input name="target_network" id="transfer-target-network" maxlength="180" placeholder="Ex.: Rede Estadual / Rede Particular">
+              </label>
+              <label>Data da transferência
+                <input name="transfer_date" id="transfer-date" type="date" required>
+              </label>
+              <label>Motivo / Observação
+                <input name="transfer_notes" id="transfer-notes" maxlength="250" placeholder="Ex.: Mudança de endereço ou solicitação do responsável">
+              </label>
+              <button class="primary" type="submit">Confirmar alteração de vínculo</button>
+            </form>
+          </div>
+
+          <div id="student-panel-documentos" class="panel-sub hidden" data-roles="gestor,secretario_escolar">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+              <div>
+                <h4 id="student-doc-title">Documentos</h4>
+                <p class="muted small" id="student-doc-subtitle">Emissão e consulta de Boletim do aluno e Histórico Escolar.</p>
+              </div>
+              <div class="inline-controls">
+                <button type="button" class="secondary small" data-doc-tab="boletim" id="btn-doc-boletim">Boletim do aluno</button>
+                <button type="button" class="secondary small" data-doc-tab="historico" id="btn-doc-historico">Histórico Escolar</button>
+              </div>
+            </div>
+            <div class="form-grid" style="margin-top:12px;">
+              <label style="grid-column: 1 / -1;">Selecione o estudante
+                <select id="doc-student-select"><option value="">Selecione</option></select>
+              </label>
+            </div>
+            <div id="student-doc-preview" style="margin-top:14px;padding:14px;border-radius:10px;border:1px solid #dbe4ee;background:#f8fafc;">
+              <p class="muted small">Selecione um estudante para visualizar o documento.</p>
+            </div>
+          </div>
+
+          <div class="table-wrap"><table><thead><tr><th>Estudante</th><th>CPF</th><th>Nascimento</th><th>Raça/Cor</th><th>PcD</th><th>Responsável</th><th>Escola</th></tr></thead><tbody id="students-body"><tr><td colspan="7">Carregando...</td></tr></tbody></table></div>
         </div>
       </section>
 
