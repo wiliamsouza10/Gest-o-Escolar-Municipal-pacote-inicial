@@ -3,263 +3,308 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sistema de Gerenciamento Escolar — SGE 3.0</title>
+  <title>Gestão Escolar Municipal</title>
   <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
   <div id="notice" class="notice hidden"></div>
 
-  <!-- =========================================================
-       TELA 1: PORTAL DE CIDADES / SELEÇÃO DE MUNICÍPIO
-       ========================================================= -->
-  <section id="city-portal-view" class="sge-auth-screen">
-    <div class="sge-auth-container">
-      <!-- Coluna Esquerda -->
-      <div class="sge-left-showcase">
-        <div class="sge-brand-header">
-          <div class="sge-logo-circle">GE</div>
-          <div class="sge-brand-texts">
-            <span class="sge-brand-title">Gestão Escolar Municipal</span>
-            <span id="city-active-badge" class="sge-city-pill">● Nenhuma cidade selecionada</span>
+  <!-- PORTAL INICIAL DE CIDADES (SELEÇÃO + SOLICITAÇÃO DE LICENÇA + ABA DE ACESSO DO PROPRIETÁRIO) -->
+  <section id="city-portal-view" class="city-portal">
+    <header class="city-topbar">
+      <div class="brand">
+        <span class="avatar">GE</span>
+        <strong>Gestão Escolar Municipal</strong>
+      </div>
+      <div class="city-topbar-actions">
+        <span id="city-active-badge" class="badge">Nenhuma cidade selecionada</span>
+        <button type="button" id="open-city-register-btn" class="primary hidden" data-owner-only-city>
+          Cadastrar Cidade
+        </button>
+      </div>
+    </header>
+
+    <main class="city-portal-grid">
+      <div class="city-preview-col">
+        <div class="laptop-frame">
+          <div class="laptop-header">
+            <span>Ambiente Municipal: <strong id="preview-city-name">Selecione um município</strong></span>
+            <span id="preview-city-slug" class="muted small">rede-municipal</span>
           </div>
-        </div>
-
-        <div class="sge-hero-copy">
-          <h1 id="preview-city-name">Painel Isolado do Município</h1>
-          <p id="preview-city-meta" class="sge-hero-meta">
-            Dados restritos ao município selecionado · <span id="preview-city-uf">UF: —</span> ·
-            <span id="preview-city-slug">rede-municipal</span>
-          </p>
-        </div>
-
-        <div class="sge-kpi-row">
-          <div class="sge-kpi-card">
-            <div class="sge-kpi-top">
-              <span class="sge-kpi-icon" aria-hidden="true">🏫</span>
-              <strong id="preview-city-schools" class="sge-kpi-number">0</strong>
+          <div class="laptop-body">
+            <div class="laptop-title-row">
+              <div>
+                <h2 style="margin:0;">Painel Isolado do Município</h2>
+                <p id="preview-city-meta" class="muted small" style="margin:4px 0 0;">Dados restritos ao município selecionado</p>
+              </div>
+              <span id="preview-city-uf" class="badge">UF: —</span>
             </div>
-            <span class="sge-kpi-label">Escolas</span>
-          </div>
-
-          <div class="sge-kpi-card">
-            <div class="sge-kpi-top">
-              <span class="sge-kpi-icon" aria-hidden="true">🎓</span>
-              <strong id="preview-city-students" class="sge-kpi-number">0</strong>
+            <div class="stats-grid" style="margin-top:16px;">
+              <div class="stat-card">
+                <strong id="preview-city-schools">0</strong>
+                <span>Escolas</span>
+              </div>
+              <div class="stat-card">
+                <strong id="preview-city-students">0</strong>
+                <span>Alunos</span>
+              </div>
+              <div class="stat-card">
+                <strong id="preview-city-classes">0</strong>
+                <span>Turmas</span>
+              </div>
             </div>
-            <span class="sge-kpi-label">Alunos</span>
-          </div>
-
-          <div class="sge-kpi-card">
-            <div class="sge-kpi-top">
-              <span class="sge-kpi-icon" aria-hidden="true">👥</span>
-              <strong id="preview-city-classes" class="sge-kpi-number">0</strong>
-            </div>
-            <span class="sge-kpi-label">Turmas</span>
           </div>
         </div>
       </div>
 
-      <!-- Coluna Direita -->
-      <div class="sge-right-card">
-        <div class="sge-card-header">
-          <div class="sge-secretaria-badge">
-            <div class="sge-secretaria-text">
-              <span>SECRETARIA DE</span>
-              <strong>EDUCAÇÃO</strong>
-            </div>
-            <div class="sge-crest-icon" aria-hidden="true">🛡️</div>
-          </div>
-          <h2>Sistema de Gerenciamento Escolar</h2>
-          <span class="sge-version-tag">SGE 3.0</span>
-        </div>
+      <div class="city-selector-col">
+        <p class="eyebrow">AMBIENTE MULTI-MUNICÍPIO</p>
+        <h1 style="margin:6px 0 10px;">Gestão <span>ESCOLAR</span> Completa</h1>
+        <p class="muted">
+          Selecione a cidade que utiliza o programa para acessar o ambiente exclusivo do município, solicite uma licença ou entre na aba do proprietário para cadastrar cidades.
+        </p>
 
-        <div class="sge-tabs">
-          <button type="button" id="tab-btn-cities" class="sge-tab active" data-portal-tab="cities">
+        <!-- ABAS DO PORTAL -->
+        <div class="portal-tabs" role="tablist" style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+          <button type="button" id="tab-btn-cities" class="secondary small active" data-portal-tab="cities">
             Municípios &amp; Licença
           </button>
-          <button type="button" id="tab-btn-owner" class="sge-tab" data-portal-tab="owner">
+          <button type="button" id="tab-btn-owner" class="secondary small" data-portal-tab="owner">
             Acesso Proprietário
           </button>
         </div>
 
-        <p id="city-portal-error" class="sge-error-msg"></p>
+        <!-- ABA 1: SELEÇÃO DE CIDADE E SOLICITAÇÃO DE LICENÇA -->
+        <div id="portal-tab-cities" class="portal-tab-panel" style="margin-top:12px;">
+          <div class="card">
+            <label for="city-select">Cidades que utilizam o programa
+              <select id="city-select">
+                <option value="">Selecione uma cidade cadastrada...</option>
+              </select>
+            </label>
 
-        <!-- Aba Municípios e Licença -->
-        <div id="portal-tab-cities" class="sge-tab-content">
-          <label class="sge-field-label" for="city-select">Cidades que utilizam o programa</label>
-          <select id="city-select" class="sge-input">
-            <option value="">Selecione uma cidade cadastrada...</option>
-          </select>
+            <div class="stack" style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
+              <button type="button" id="enter-selected-city-btn" class="primary">
+                Acessar Programa da Cidade
+              </button>
+              <button type="button" id="open-license-request-btn" class="secondary">
+                Solicitar Contratação de Licença
+              </button>
+            </div>
 
-          <button type="button" id="enter-selected-city-btn" class="sge-btn sge-btn-primary">
-            Acessar Programa da Cidade
-          </button>
-
-          <button type="button" id="open-license-request-btn" class="sge-btn sge-btn-secondary">
-            Solicitar Contratação de Licença
-          </button>
-
-          <div class="sge-helper-links">
-            <a href="#" id="login-forgot-password-link">Esqueceu sua senha?</a>
-            <a href="#" id="login-first-access-link">Primeiro acesso?</a>
+            <p id="city-portal-error" class="error small" style="margin-top:10px;"></p>
           </div>
 
-          <button type="button" id="open-city-register-btn" class="sge-btn sge-btn-success">
-            Cadastrar Novo Município
-          </button>
-
-          <div id="license-request-panel" class="sge-subpanel hidden">
-            <h3>Solicitar Licença Municipal</h3>
-            <form id="license-request-form" class="sge-form-stack">
-              <div class="sge-form-row">
-                <input type="text" id="req-city-name" class="sge-input" placeholder="Nome do Município *" required />
-                <input type="text" id="req-city-uf" class="sge-input" placeholder="UF *" maxlength="2" style="max-width:78px;text-transform:uppercase;" required />
-              </div>
-              <input type="text" id="req-city-ibge" class="sge-input" placeholder="Código IBGE (opcional)" />
-              <input type="text" id="req-contact-name" class="sge-input" placeholder="Nome do Responsável *" required />
-              <input type="email" id="req-contact-email" class="sge-input" placeholder="E-mail institucional *" required />
-              <input type="text" id="req-contact-phone" class="sge-input" placeholder="Telefone / WhatsApp" />
-              <input type="text" id="req-notes" class="sge-input" placeholder="Observações (opcional)" />
-              <div class="sge-form-row">
-                <button type="submit" class="sge-btn sge-btn-primary">Enviar Solicitação</button>
-                <button type="button" id="cancel-license-request-btn" class="sge-btn sge-btn-secondary">Cancelar</button>
+          <!-- FORMULÁRIO PÚBLICO DE SOLICITAÇÃO DE CONTRATAÇÃO DE LICENÇA -->
+          <div id="license-request-panel" class="card hidden" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Solicitar Contratação de Licença</h3>
+            <p class="muted small">
+              Envie os dados do município para contratação da licença. Após aprovação do proprietário, a cidade será ativada no sistema.
+            </p>
+            <form id="license-request-form" class="grid-2">
+              <label>Município
+                <input type="text" id="req-city-name" required placeholder="Ex.: Santa Inês" />
+              </label>
+              <label>UF
+                <input type="text" id="req-city-uf" maxlength="2" required placeholder="Ex.: BA" />
+              </label>
+              <label>Código IBGE (opcional)
+                <input type="text" id="req-city-ibge" placeholder="Ex.: 2928008" />
+              </label>
+              <label>Nome e cargo do solicitante
+                <input type="text" id="req-contact-name" required placeholder="Ex.: Maria Souza - Secretária" />
+              </label>
+              <label>E-mail institucional
+                <input type="email" id="req-contact-email" required placeholder="contato@educacao.gov.br" />
+              </label>
+              <label>Telefone / WhatsApp
+                <input type="text" id="req-contact-phone" placeholder="(00) 90000-0000" />
+              </label>
+              <label style="grid-column: 1 / -1;">Observações sobre a licença
+                <input type="text" id="req-notes" placeholder="Ex.: Contratação anual para 12 escolas municipais" />
+              </label>
+              <div style="grid-column: 1 / -1; display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="submit" class="primary">Enviar Solicitação de Licença</button>
+                <button type="button" id="cancel-license-request-btn" class="secondary">Cancelar</button>
               </div>
             </form>
-            <p id="license-request-feedback" class="sge-feedback-msg"></p>
+            <p id="license-request-feedback" class="small" style="margin-top:10px;"></p>
           </div>
         </div>
 
-        <!-- Aba Proprietário -->
-        <div id="portal-tab-owner" class="sge-tab-content hidden">
-          <div id="owner-login-card">
-            <form id="owner-login-form" class="sge-form-stack">
-              <label class="sge-field-label" for="owner-email">E-mail do Proprietário</label>
-              <input type="email" id="owner-email" class="sge-input" placeholder="proprietario@dominio.com" required />
-
-              <label class="sge-field-label" for="owner-password">Senha</label>
-              <input type="password" id="owner-password" class="sge-input" placeholder="••••••••" required />
-
-              <p id="owner-login-error" class="sge-error-msg"></p>
-              <button type="submit" class="sge-btn sge-btn-primary">Entrar como Proprietário</button>
+        <!-- ABA 2: LOGIN E CADASTRO DE CIDADES EXCLUSIVO DO PROPRIETÁRIO DO PROGRAMA -->
+        <div id="portal-tab-owner" class="portal-tab-panel hidden" style="margin-top:12px;">
+          <!-- LOGIN DO PROPRIETÁRIO -->
+          <div id="owner-login-card" class="card">
+            <p class="eyebrow" style="margin:0;">ÁREA DO PROPRIETÁRIO</p>
+            <h3 style="margin:4px 0 6px;">Entrar para Cadastrar Cidades</h3>
+            <p class="muted small">
+              Digite o e-mail e a senha do proprietário do programa para cadastrar municípios que entraram em contato solicitando licença.
+            </p>
+            <form id="owner-login-form" class="stack" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+              <label for="owner-email">E-mail do proprietário
+                <input type="email" id="owner-email" name="owner_email" required autocomplete="username" placeholder="proprietario@programa.com" />
+              </label>
+              <label for="owner-password">Senha
+                <input type="password" id="owner-password" name="owner_password" required autocomplete="current-password" placeholder="••••••••" />
+              </label>
+              <button type="submit" class="primary">Entrar como Proprietário</button>
             </form>
+            <p id="owner-login-error" class="error small" style="margin-top:10px;"></p>
           </div>
 
-          <div id="owner-workspace-card" class="hidden">
-            <div class="sge-owner-bar">
-              <span id="owner-session-label" class="muted small"></span>
-              <button type="button" id="owner-logout-btn" class="sge-btn-mini">Sair</button>
+          <!-- PAINEL DO PROPRIETÁRIO AUTENTICADO (CADASTRO DE CIDADES + SOLICITAÇÕES RECEBIDAS) -->
+          <div id="owner-workspace-card" class="hidden" style="margin-top:12px;">
+            <div class="card">
+              <div class="section-head">
+                <div>
+                  <span class="badge">● Proprietário autenticado</span>
+                  <h3 id="owner-session-label" style="margin:6px 0 2px;">Proprietário do Programa</h3>
+                  <p class="muted small" style="margin:0;">Cadastre novas cidades após contato e contratação.</p>
+                </div>
+                <button type="button" id="owner-logout-btn" class="secondary small">Sair da aba</button>
+              </div>
+
+              <form id="city-register-form" class="grid-2" style="margin-top:14px;">
+                <label>Nome do município
+                  <input type="text" id="city-name-input" required placeholder="Ex.: Santa Inês" />
+                </label>
+                <label>UF
+                  <input type="text" id="city-uf-input" maxlength="2" required placeholder="Ex.: BA" />
+                </label>
+                <label>Código IBGE
+                  <input type="text" id="city-ibge-input" placeholder="Ex.: 2928008" />
+                </label>
+                <label>Secretaria / Observação
+                  <input type="text" id="city-sec-input" placeholder="Ex.: Secretaria Municipal de Educação" />
+                </label>
+                <div style="grid-column: 1 / -1;">
+                  <button type="submit" class="primary">Salvar e Liberar Município</button>
+                </div>
+              </form>
+              <p id="owner-city-feedback" class="small" style="margin-top:10px;"></p>
             </div>
 
-            <form id="city-register-form" class="sge-form-stack">
-              <div class="sge-form-row">
-                <input type="text" id="city-name-input" class="sge-input" placeholder="Município *" required />
-                <input type="text" id="city-uf-input" class="sge-input" placeholder="UF *" maxlength="2" style="max-width:78px;text-transform:uppercase;" required />
+            <div class="card" style="margin-top:14px;">
+              <div class="section-head">
+                <h4 style="margin:0;">Solicitações de cidades recebidas</h4>
+                <button type="button" id="owner-refresh-requests-btn" class="secondary small">Atualizar</button>
               </div>
-              <input type="text" id="city-ibge-input" class="sge-input" placeholder="Código IBGE (opcional)" />
-              <input type="text" id="city-sec-input" class="sge-input" placeholder="Nome da Secretaria (opcional)" />
-              <button type="submit" class="sge-btn sge-btn-success">Salvar e Liberar Município</button>
-            </form>
-            <p id="owner-city-feedback" class="sge-feedback-msg"></p>
-
-            <div class="sge-requests-box">
-              <div class="sge-owner-bar">
-                <strong>Solicitações Recebidas</strong>
-                <button type="button" id="owner-refresh-requests-btn" class="sge-btn-mini">Atualizar</button>
-              </div>
-              <div id="owner-license-requests-list"></div>
+              <div id="owner-license-requests-list" style="margin-top:10px;"></div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   </section>
 
-  <!-- =========================================================
-       TELA 2: LOGIN INSTITUCIONAL DO MUNICÍPIO
-       ========================================================= -->
-  <section id="login-view" class="sge-auth-screen hidden">
-    <div class="sge-auth-container">
-      <div class="sge-left-showcase">
-        <div class="sge-brand-header">
-          <div class="sge-logo-circle">GE</div>
-          <div class="sge-brand-texts">
-            <span id="login-city-eyebrow" class="sge-brand-title">MUNICÍPIO SELECIONADO</span>
-            <span id="login-city-badge" class="sge-city-pill">● REDE MUNICIPAL</span>
-          </div>
-        </div>
+  <!-- TELA DE LOGIN DO MUNICÍPIO SELECIONADO -->
+  <section id="login-view" class="login-wrap login-screen hidden">
+    <div class="login-hero-brand">
+      <div class="login-brand-mark" aria-hidden="true">
+        <span class="avatar">GE</span>
+      </div>
+      <div class="login-brand-copy">
+        <span class="login-system-tag">Gestão Escolar Municipal</span>
+        <p id="login-city-eyebrow" class="eyebrow">MUNICÍPIO SELECIONADO</p>
+      </div>
+    </div>
 
-        <div class="sge-hero-copy">
-          <h1 id="login-city-title">Gestão Escolar Municipal</h1>
-          <p id="login-city-subtitle" class="sge-hero-meta">
-            Acesso exclusivo da cidade selecionada. Dados isolados de outros municípios.
+    <div class="login-layout">
+      <!-- COLUNA ESQUERDA: DESTAQUE VISUAL / ILUSTRAÇÃO -->
+      <div class="login-visual-col">
+        <div id="login-visual-panel" class="login-visual-panel" aria-hidden="true">
+          <div class="login-visual-badge">Ambiente Municipal Digital</div>
+          <h2 class="login-visual-title">Acompanhamento escolar simples e integrado</h2>
+          <p class="login-visual-text">
+            Acesso centralizado para gestão de unidades escolares, alunos, matrículas, turmas, diário de classe e indicadores da rede.
           </p>
         </div>
       </div>
 
-      <div class="sge-right-card">
-        <div class="sge-card-header">
-          <div class="sge-secretaria-badge">
-            <div class="sge-secretaria-text">
-              <span>SECRETARIA DE</span>
-              <strong>EDUCAÇÃO</strong>
+      <!-- COLUNA DIREITA: CARD DE LOGIN NO ESTILO DA REFERÊNCIA -->
+      <div class="login-form-col">
+        <div class="card login-card">
+          <header class="login-card-header">
+            <div class="login-institution-block">
+              <span class="login-institution-title">SECRETARIA MUNICIPAL DE EDUCAÇÃO</span>
+              <span id="login-city-badge" class="login-institution-sub">REDE MUNICIPAL</span>
             </div>
-            <div class="sge-crest-icon" aria-hidden="true">🛡️</div>
+            <div class="login-emblem-slot" aria-hidden="true">
+              <span class="avatar small-avatar">GE</span>
+            </div>
+          </header>
+
+          <div class="login-card-title-group">
+            <h1 id="login-city-title" class="login-main-title">Sistema de Gerenciamento Escolar</h1>
+            <p id="login-city-subtitle" class="login-sub-title">Acesso exclusivo da cidade selecionada.</p>
           </div>
-          <h2>Sistema de Gerenciamento Escolar</h2>
-          <span class="sge-version-tag">SGE 3.0</span>
+
+          <form id="login-form" class="login-form stack">
+            <div class="login-field-group">
+              <label for="email" class="login-field-label">Usuário:</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                class="login-input"
+                required
+                autocomplete="username"
+                placeholder="Usuário"
+              />
+            </div>
+
+            <div class="login-field-group">
+              <label for="password" class="login-field-label">Senha:</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                class="login-input"
+                required
+                autocomplete="current-password"
+                placeholder="Senha"
+              />
+            </div>
+
+            <div class="login-helper-links">
+              <a href="#recuperar-senha" id="login-forgot-password-link" class="login-link">Esqueceu sua senha?</a>
+              <a href="#primeiro-acesso" id="login-first-access-link" class="login-link">Primeiro acesso?</a>
+            </div>
+
+            <button type="submit" id="login-submit-btn" class="primary login-submit-btn">Entrar</button>
+          </form>
+
+          <p id="login-error" class="error small login-error" role="alert"></p>
+
+          <footer class="login-card-footer">
+            <button type="button" id="back-to-city-portal-from-login" class="secondary small">
+              ← Trocar de cidade
+            </button>
+            <button type="button" id="go-to-owner-tab-from-login" class="secondary small">
+              Acesso Proprietário
+            </button>
+          </footer>
         </div>
-
-        <form id="login-form" class="sge-form-stack">
-          <label class="sge-field-label" for="email">E-mail institucional</label>
-          <input type="email" id="email" class="sge-input" placeholder="usuario@educacao.gov.br" required />
-
-          <label class="sge-field-label" for="password">Senha</label>
-          <input type="password" id="password" class="sge-input" placeholder="••••••••" required />
-
-          <p id="login-error" class="sge-error-msg"></p>
-
-          <button type="submit" class="sge-btn sge-btn-success">Entrar</button>
-          <button type="button" id="back-to-city-portal-from-login" class="sge-btn sge-btn-secondary">
-            ← Trocar de Município
-          </button>
-          <button type="button" id="go-to-owner-tab-from-login" class="sge-btn-link">
-            Acesso do Proprietário
-          </button>
-        </form>
       </div>
     </div>
   </section>
 
-  <!-- =========================================================
-       TELA 3: APLICAÇÃO PRINCIPAL (APÓS LOGIN)
-       ========================================================= -->
+  <!-- APLICAÇÃO PRINCIPAL -->
   <div id="app-view" class="app-shell hidden">
     <aside class="sidebar">
-      <div class="side-brand">
-        <div class="side-logo">GE</div>
+      <div class="brand-box">
+        <span class="avatar">GE</span>
         <div>
-          <div id="side-city-name" class="side-title">Gestão Escolar</div>
-          <div id="side-city-sub" class="side-sub">Rede Municipal</div>
+          <strong id="side-city-name">Gestão Escolar</strong>
+          <div id="side-city-sub" class="muted small">Rede Municipal</div>
         </div>
       </div>
 
-      <div class="user-card">
-        <div id="avatar" class="avatar">U</div>
-        <div>
-          <div id="user-name" class="user-name">Usuário</div>
-          <div id="user-role" class="user-role">Perfil</div>
-        </div>
-      </div>
-
-      <div class="side-actions">
-        <button type="button" id="switch-city-btn" class="secondary small">Trocar cidade</button>
-        <button type="button" id="logout" class="secondary small">Sair</button>
-      </div>
-
-      <nav class="nav-menu">
+      <nav class="nav-list">
         <button type="button" class="nav-item active" data-page="inicio">Painel inicial</button>
-        <button type="button" class="nav-item" data-page="escolas" data-roles="secretaria">Unidades escolares</button>
-        <button type="button" class="nav-item" data-page="alunos" data-roles="secretaria,gestor,secretario_escolar">Cadastro de alunos</button>
+        <button type="button" class="nav-item" data-page="escolas" data-roles="secretaria,gestor,secretario_escolar">Unidades escolares</button>
+        <button type="button" class="nav-item" data-page="alunos" data-roles="secretaria,gestor,secretario_escolar,professor">Cadastro de alunos</button>
         <button type="button" class="nav-item" data-page="matriculas" data-roles="gestor,secretario_escolar">Matrículas</button>
         <button type="button" class="nav-item" data-page="turmas" data-roles="gestor,secretario_escolar">Turmas</button>
         <button type="button" class="nav-item" data-page="diario" data-roles="gestor,secretario_escolar,professor">Diário de classe</button>
@@ -268,115 +313,103 @@
         <button type="button" class="nav-item" data-page="relatorios" data-roles="secretaria,gestor,secretario_escolar">Relatórios</button>
         <button type="button" class="nav-item" data-page="usuarios" data-roles="secretaria">Cadastro de usuários</button>
       </nav>
+
+      <div class="sidebar-footer">
+        <button type="button" id="switch-city-btn" class="secondary small" style="width:100%; margin-bottom:8px;">
+          Trocar município
+        </button>
+        <button type="button" id="logout" class="secondary small" style="width:100%;">
+          Sair
+        </button>
+      </div>
     </aside>
 
-    <div class="main-area">
+    <div class="main-col">
       <header class="topbar">
         <div>
-          <div id="topbar-city-eyebrow" class="eyebrow">PLATAFORMA EDUCACIONAL</div>
-          <h2 id="page-title">Painel inicial</h2>
+          <span id="topbar-city-eyebrow" class="eyebrow">PLATAFORMA EDUCACIONAL</span>
+          <h2 id="page-title" style="margin:2px 0 0;">Painel inicial</h2>
         </div>
 
         <div class="topbar-right">
           <span id="topbar-city-badge" class="badge">● Ambiente protegido</span>
 
-          <div data-roles="secretaria" class="school-switcher hidden">
-            <input
-              type="text"
-              id="secretaria-school-search"
-              list="secretaria-schools-list"
-              placeholder="Buscar escola por nome, ID ou INEP..."
-            />
+          <div class="school-search-box" data-roles="secretaria">
+            <input type="text" id="secretaria-school-search" list="secretaria-schools-list" placeholder="Buscar escola por nome, ID ou INEP..." />
             <datalist id="secretaria-schools-list"></datalist>
-            <button type="button" id="secretaria-clear-school" class="secondary small">Rede toda</button>
+            <button type="button" id="secretaria-clear-school" class="secondary small">Limpar</button>
+          </div>
+
+          <div class="user-chip">
+            <span id="avatar" class="avatar small-avatar">U</span>
+            <div>
+              <strong id="user-name">Usuário</strong>
+              <div id="user-role" class="muted small">Perfil</div>
+            </div>
           </div>
         </div>
       </header>
 
       <main class="content">
-        <!-- PAINEL INICIAL -->
+        <!-- PÁGINA: INÍCIO -->
         <section id="page-inicio" class="page">
           <div class="card">
-            <div id="inicio-city-eyebrow" class="eyebrow">GESTÃO INTEGRADA MUNICIPAL</div>
-            <h3 id="inicio-welcome-title">Bem-vindo(a) ao Gestão Escolar</h3>
+            <p id="inicio-city-eyebrow" class="eyebrow">GESTÃO INTEGRADA MUNICIPAL</p>
+            <h1 id="inicio-welcome-title" style="margin:4px 0 8px;">Bem-vindo(a) ao Gestão Escolar</h1>
             <p id="inicio-school-subtitle" class="muted">Acompanhe as informações gerais da rede municipal e das unidades escolares.</p>
+          </div>
 
-            <div id="school-identity-card" class="identity-strip hidden">
-              <div><strong>ID da Escola:</strong> <span id="home-school-id">—</span></div>
-              <div><strong>Código INEP:</strong> <span id="home-school-inep">—</span></div>
-              <div><strong>Oferta Curricular:</strong> <span id="home-school-curriculum">—</span></div>
+          <div id="school-identity-card" class="card hidden" style="margin-top:16px;">
+            <div class="grid-3">
+              <div><span class="muted small">ID da Unidade</span><br /><strong id="home-school-id">—</strong></div>
+              <div><span class="muted small">Código INEP</span><br /><strong id="home-school-inep">—</strong></div>
+              <div><span class="muted small">Oferta / Currículo</span><br /><strong id="home-school-curriculum">—</strong></div>
             </div>
+          </div>
 
-            <div class="stats-grid">
-              <div class="stat-card">
-                <span class="stat-label">Escolas</span>
-                <strong id="stat-escolas" class="stat-value">0</strong>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">Alunos</span>
-                <strong id="stat-alunos" class="stat-value">0</strong>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">Turmas</span>
-                <strong id="stat-turmas" class="stat-value">0</strong>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">Matrículas ativas</span>
-                <strong id="stat-matriculas" class="stat-value">0</strong>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">Atendimento AEE</span>
-                <strong id="stat-aee" class="stat-value">0</strong>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">Alunos PcD</span>
-                <strong id="stat-pcd" class="stat-value">0</strong>
-              </div>
-            </div>
-
-            <div class="quick-actions">
-              <button type="button" class="primary" data-goto="alunos" data-roles="secretaria,gestor,secretario_escolar">Cadastrar aluno</button>
-              <button type="button" class="secondary" data-goto="matriculas" data-roles="gestor,secretario_escolar">Nova matrícula</button>
-              <button type="button" class="secondary" data-goto="turmas" data-roles="gestor,secretario_escolar">Nova turma</button>
-              <button type="button" class="secondary" data-goto="diario" data-roles="gestor,secretario_escolar,professor">Diário de classe</button>
-              <button type="button" class="secondary" data-goto="relatorios" data-roles="secretaria,gestor,secretario_escolar">Relatórios</button>
-            </div>
+          <div class="stats-grid" style="margin-top:16px;">
+            <div class="stat-card"><strong id="stat-escolas">0</strong><span>Escolas</span></div>
+            <div class="stat-card"><strong id="stat-alunos">0</strong><span>Alunos</span></div>
+            <div class="stat-card"><strong id="stat-turmas">0</strong><span>Turmas</span></div>
+            <div class="stat-card"><strong id="stat-matriculas">0</strong><span>Matrículas ativas</span></div>
+            <div class="stat-card"><strong id="stat-aee">0</strong><span>Atendimento AEE</span></div>
+            <div class="stat-card"><strong id="stat-pcd">0</strong><span>Alunos PcD</span></div>
           </div>
         </section>
 
-        <!-- UNIDADES ESCOLARES -->
+        <!-- PÁGINA: ESCOLAS -->
         <section id="page-escolas" class="page hidden">
           <div class="card" data-roles="secretaria">
-            <div class="card-head-row">
+            <div class="section-head">
               <div>
-                <h3>Cadastrar unidade escolar</h3>
-                <p class="muted small">Preencha os blocos temáticos do Censo Escolar da unidade e clique em <strong>Cadastrar escola</strong>.</p>
+                <h3 style="margin:0;">Nova unidade escolar</h3>
+                <p class="muted small" style="margin:4px 0 0;">Preencha os blocos temáticos da unidade antes de salvar o cadastro definitivo.</p>
               </div>
-              <button type="button" id="toggle-school-census-panel" class="secondary small">Blocos do Censo</button>
+              <button type="button" id="toggle-school-census-panel" class="secondary">Blocos do Censo da Escola</button>
             </div>
 
-            <p id="school-census-draft-status" class="muted small"></p>
+            <p id="school-census-draft-status" class="muted small" style="margin-top:10px;"></p>
 
-            <div id="school-census-panel" class="census-panel">
-              <div id="school-census-modules-grid" class="census-grid"></div>
+            <div id="school-census-panel" style="margin-top:14px;">
+              <div id="school-census-modules-grid" class="modules-grid"></div>
 
-              <div id="school-census-module-editor" class="subcard hidden">
-                <h4 id="school-census-editor-title">Bloco</h4>
-                <div id="school-census-module-fields" class="form-grid"></div>
-                <div class="form-actions">
-                  <button type="button" id="school-census-apply-module" class="primary small">Salvar bloco</button>
-                  <button type="button" id="school-census-cancel-module" class="secondary small">Fechar bloco</button>
+              <div id="school-census-module-editor" class="card hidden" style="margin-top:14px;">
+                <h4 id="school-census-editor-title" style="margin-top:0;">Bloco</h4>
+                <div id="school-census-module-fields" class="grid-2"></div>
+                <div style="margin-top:12px; display:flex; gap:8px;">
+                  <button type="button" id="school-census-apply-module" class="primary">Salvar bloco</button>
+                  <button type="button" id="school-census-cancel-module" class="secondary">Fechar bloco</button>
                 </div>
               </div>
             </div>
 
-            <form id="school-form" class="form-actions">
+            <form id="school-form" style="margin-top:16px;">
               <button type="submit" class="primary">Cadastrar escola</button>
             </form>
           </div>
 
-          <div class="card">
-            <h3>Escolas cadastradas</h3>
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Unidades escolares cadastradas</h3>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -385,7 +418,7 @@
                     <th>Nome</th>
                     <th>Gestor</th>
                     <th>INEP</th>
-                    <th>Oferta</th>
+                    <th>Currículo / Etapas</th>
                     <th>Endereço</th>
                     <th>Telefone</th>
                     <th>Ações</th>
@@ -397,11 +430,11 @@
           </div>
         </section>
 
-        <!-- CADASTRO DE ALUNOS -->
+        <!-- PÁGINA: ALUNOS -->
         <section id="page-alunos" class="page hidden">
           <div class="card" data-roles="secretaria,gestor,secretario_escolar">
-            <h3>Cadastrar aluno</h3>
-            <form id="student-form" class="form-grid">
+            <h3 style="margin-top:0;">Cadastrar aluno</h3>
+            <form id="student-form" class="grid-2">
               <label>Nome completo
                 <input type="text" name="full_name" required />
               </label>
@@ -409,7 +442,7 @@
                 <input type="text" name="cpf" maxlength="14" placeholder="000.000.000-00" />
               </label>
               <label>Data de nascimento
-                <input type="date" name="birth_date" required />
+                <input type="date" name="birth_date" />
               </label>
               <label>Raça / Cor
                 <select name="race_color">
@@ -436,17 +469,17 @@
               <label>Telefone do responsável
                 <input type="text" name="guardian_phone" />
               </label>
-              <label class="full-span">Observações
+              <label style="grid-column: 1 / -1;">Observações
                 <input type="text" name="notes" />
               </label>
-              <div class="form-actions full-span">
+              <div style="grid-column: 1 / -1;">
                 <button type="submit" class="primary">Salvar aluno</button>
               </div>
             </form>
           </div>
 
-          <div class="card">
-            <h3>Alunos cadastrados</h3>
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Alunos cadastrados</h3>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -466,26 +499,17 @@
           </div>
         </section>
 
-        <!-- MATRÍCULAS -->
+        <!-- PÁGINA: MATRÍCULAS -->
         <section id="page-matriculas" class="page hidden">
           <div class="stats-grid">
-            <div class="stat-card">
-              <span class="stat-label">Matrículas ativas</span>
-              <strong id="enrollments-active-count" class="stat-value">0</strong>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Atendimento AEE</span>
-              <strong id="enrollments-aee-count" class="stat-value">0</strong>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Alunos PcD</span>
-              <strong id="enrollments-pcd-count" class="stat-value">0</strong>
-            </div>
+            <div class="stat-card"><strong id="enrollments-active-count">0</strong><span>Matrículas ativas</span></div>
+            <div class="stat-card"><strong id="enrollments-aee-count">0</strong><span>Atendimento AEE</span></div>
+            <div class="stat-card"><strong id="enrollments-pcd-count">0</strong><span>Alunos PcD</span></div>
           </div>
 
-          <div class="card">
-            <h3>Enturmar aluno</h3>
-            <form id="enrollment-form" class="form-grid">
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Nova matrícula / enturmação</h3>
+            <form id="enrollment-form" class="grid-2">
               <label>Aluno
                 <select id="enrollment-student" name="student_id" required></select>
               </label>
@@ -495,7 +519,7 @@
               <label>Ano letivo
                 <input type="number" name="school_year" required />
               </label>
-              <label>Transporte escolar?
+              <label>Transporte escolar
                 <select name="uses_school_transport">
                   <option value="false">Não</option>
                   <option value="true">Sim</option>
@@ -503,19 +527,20 @@
               </label>
               <label>Situação
                 <select name="status">
-                  <option value="ativa">Ativa</option>
-                  <option value="transferida">Transferida</option>
-                  <option value="cancelada">Cancelada</option>
+                  <option value="ativa">ativa</option>
+                  <option value="aguardando">aguardando</option>
+                  <option value="transferida">transferida</option>
+                  <option value="cancelada">cancelada</option>
                 </select>
               </label>
-              <div class="form-actions full-span">
-                <button type="submit" class="primary">Confirmar matrícula</button>
+              <div style="align-self:end;">
+                <button type="submit" class="primary">Registrar matrícula</button>
               </div>
             </form>
           </div>
 
-          <div class="card">
-            <h3>Matrículas registradas</h3>
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Matrículas registradas</h3>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -535,19 +560,33 @@
           </div>
         </section>
 
-        <!-- TURMAS -->
+        <!-- PÁGINA: TURMAS -->
         <section id="page-turmas" class="page hidden">
           <div class="card">
-            <h3>Cadastrar turma</h3>
-            <form id="class-form" class="form-grid">
+            <h3 style="margin-top:0;">Nova turma</h3>
+            <form id="class-form" class="grid-2">
               <label>Nome da turma
-                <input type="text" name="name" placeholder="Ex.: 1º Ano A" required />
+                <input type="text" name="name" required placeholder="Ex.: 1º Ano A" />
               </label>
-              <label>Complemento
-                <input type="text" name="class_complement" placeholder="Ex.: Multisseriada, Anexo" />
+              <label>Complemento da turma
+                <input type="text" name="class_complement" placeholder="Ex.: Anexo / Multisseriada" />
               </label>
               <label>Etapa de ensino
-                <input type="text" name="grade_level" placeholder="Ex.: Ensino Fundamental I" required />
+                <input type="text" name="grade_level" required placeholder="Ex.: Ensino Fundamental I" />
+              </label>
+              <label>Turno
+                <select name="shift">
+                  <option value="Matutino">Matutino</option>
+                  <option value="Vespertino">Vespertino</option>
+                  <option value="Noturno">Noturno</option>
+                  <option value="Integral">Integral</option>
+                </select>
+              </label>
+              <label>Ano letivo
+                <input type="number" name="school_year" required />
+              </label>
+              <label>Capacidade máxima de alunos
+                <input type="number" name="max_students" value="30" min="1" />
               </label>
               <label>Modalidade
                 <select name="modality">
@@ -562,42 +601,20 @@
                   <option value="Sim">Sim</option>
                 </select>
               </label>
-              <label>Turno
-                <select name="shift">
-                  <option value="Matutino">Matutino</option>
-                  <option value="Vespertino">Vespertino</option>
-                  <option value="Noturno">Noturno</option>
-                  <option value="Integral">Integral</option>
-                </select>
-              </label>
-              <label>Horário início
-                <input type="time" name="start_time" />
-              </label>
-              <label>Horário término
-                <input type="time" name="end_time" />
-              </label>
-              <label>Capacidade máxima
-                <input type="number" name="max_students" value="30" min="1" />
-              </label>
-              <label>Ano letivo
-                <input type="number" name="school_year" required />
-              </label>
               <label>Unidade escolar
                 <select id="class-school" name="school_id" required></select>
               </label>
               <label>Professor regente
-                <select id="class-teacher" name="teacher_id">
-                  <option value="">Não definido</option>
-                </select>
+                <select id="class-teacher" name="teacher_id"></select>
               </label>
-              <div class="form-actions full-span">
-                <button type="submit" class="primary">Salvar turma</button>
+              <div style="grid-column: 1 / -1;">
+                <button type="submit" class="primary">Criar turma</button>
               </div>
             </form>
           </div>
 
-          <div class="card">
-            <h3>Turmas cadastradas</h3>
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Turmas cadastradas</h3>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -621,11 +638,11 @@
           </div>
         </section>
 
-        <!-- DIÁRIO DE CLASSE -->
+        <!-- PÁGINA: DIÁRIO DE CLASSE -->
         <section id="page-diario" class="page hidden">
           <div class="card">
-            <h3>Registrar aula</h3>
-            <form id="lesson-form" class="form-grid">
+            <h3 style="margin-top:0;">Registrar aula</h3>
+            <form id="lesson-form" class="grid-2">
               <label>Turma
                 <select id="diary-class" name="class_id" required></select>
               </label>
@@ -633,36 +650,22 @@
                 <input type="date" name="lesson_date" required />
               </label>
               <label>Componente / Disciplina
-                <input type="text" name="subject" required />
+                <input type="text" name="subject" required placeholder="Ex.: Língua Portuguesa" />
               </label>
-              <label class="full-span">Conteúdo ministrado
-                <input type="text" name="content" required />
+              <label>Atividade aplicada
+                <input type="text" name="activity" placeholder="Ex.: Exercício no caderno" />
               </label>
-              <div class="form-actions full-span">
-                <button type="submit" class="primary">Registrar aula</button>
+              <label style="grid-column: 1 / -1;">Conteúdo ministrado
+                <input type="text" name="content" required placeholder="Resumo do conteúdo trabalhado em aula" />
+              </label>
+              <div style="grid-column: 1 / -1;">
+                <button type="submit" class="primary">Salvar aula</button>
               </div>
             </form>
           </div>
 
-          <div class="card">
-            <h3>Frequência por turma</h3>
-            <div class="form-grid">
-              <label>Turma
-                <select id="attendance-class"></select>
-              </label>
-              <label>Data
-                <input type="date" id="attendance-date" />
-              </label>
-              <div class="form-actions">
-                <button type="button" id="load-attendance" class="secondary">Carregar alunos</button>
-                <button type="button" id="save-attendance" class="primary hidden">Salvar frequência</button>
-              </div>
-            </div>
-            <div id="attendance-list" class="attendance-box"></div>
-          </div>
-
-          <div class="card">
-            <h3>Aulas registradas</h3>
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Aulas registradas</h3>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -677,61 +680,78 @@
               </table>
             </div>
           </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Frequência diária</h3>
+            <div class="grid-3">
+              <label>Turma
+                <select id="attendance-class"></select>
+              </label>
+              <label>Data
+                <input type="date" id="attendance-date" />
+              </label>
+              <div style="align-self:end;">
+                <button type="button" id="load-attendance" class="secondary">Carregar alunos</button>
+              </div>
+            </div>
+            <div id="attendance-list" style="margin-top:14px;"></div>
+            <div style="margin-top:12px;">
+              <button type="button" id="save-attendance" class="primary hidden">Salvar frequência</button>
+            </div>
+          </div>
         </section>
 
-        <!-- MATRIZ CURRICULAR E MONITORES -->
+        <!-- PÁGINA: MATRIZ CURRICULAR E MONITORES -->
         <section id="page-matriz" class="page hidden">
-          <div class="card" data-roles="secretaria,gestor">
-            <h3>Adicionar componente ou atividade complementar</h3>
-            <form id="curriculum-form" class="form-grid">
+          <div class="card">
+            <h3 style="margin-top:0;">Adicionar componente ou atividade complementar</h3>
+            <form id="curriculum-form" class="grid-2">
               <label>Etapa de ensino
                 <select id="curriculum-stage-select" name="stage" required>
                   <option value="Educação Infantil">Educação Infantil</option>
                   <option value="Ensino Fundamental I (1º ao 5º ano)">Ensino Fundamental I (1º ao 5º ano)</option>
                   <option value="Ensino Fundamental II (6º ao 9º ano)">Ensino Fundamental II (6º ao 9º ano)</option>
-                  <option value="EJA">EJA</option>
                 </select>
               </label>
-              <label>Componente / Atividade
-                <input type="text" name="subject" required />
-              </label>
-              <label>Área do conhecimento
-                <input type="text" name="area" />
-              </label>
-              <label>Obrigatoriedade
+              <label>Tipo de oferta
                 <select id="curriculum-requirement-select" name="requirement_type">
                   <option value="obrigatoria">Obrigatória</option>
                   <option value="complementar_nao_obrigatoria">Complementar (Não obrigatória)</option>
                 </select>
               </label>
-              <label>Carga horária anual (h)
-                <input type="number" name="annual_hours" min="0" value="200" required />
+              <label>Componente / Atividade
+                <input type="text" name="subject" required placeholder="Ex.: Matemática ou Oficina de Robótica" />
               </label>
-              <div class="form-actions full-span">
+              <label>Área do conhecimento
+                <input type="text" name="area" placeholder="Ex.: Linguagens / Atividades Complementares" />
+              </label>
+              <label>Carga horária anual (h)
+                <input type="number" name="annual_hours" min="0" value="100" required />
+              </label>
+              <div style="align-self:end;">
                 <button type="submit" class="primary">Adicionar à matriz</button>
               </div>
             </form>
-          </div>
 
-          <div class="card">
-            <div class="card-head-row">
-              <h3>Matriz curricular</h3>
-              <div class="filter-row">
+            <div class="grid-2" style="margin-top:16px;">
+              <label>Filtrar por etapa
                 <select id="curriculum-filter-stage">
                   <option value="">Todas as etapas</option>
                   <option value="Educação Infantil">Educação Infantil</option>
                   <option value="Ensino Fundamental I (1º ao 5º ano)">Ensino Fundamental I (1º ao 5º ano)</option>
                   <option value="Ensino Fundamental II (6º ao 9º ano)">Ensino Fundamental II (6º ao 9º ano)</option>
-                  <option value="EJA">EJA</option>
                 </select>
+              </label>
+              <label>Filtrar por tipo
                 <select id="curriculum-filter-requirement">
-                  <option value="">Todas</option>
+                  <option value="">Todos os tipos</option>
                   <option value="obrigatoria">Obrigatória</option>
                   <option value="complementar_nao_obrigatoria">Complementar (Não obrigatória)</option>
                 </select>
-              </div>
+              </label>
             </div>
-            <div class="table-wrap">
+
+            <div class="table-wrap" style="margin-top:14px;">
               <table>
                 <thead>
                   <tr>
@@ -740,7 +760,7 @@
                     <th>Área</th>
                     <th>Tipo</th>
                     <th>Carga horária</th>
-                    <th>Ação</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody id="curriculum-body"></tbody>
@@ -748,9 +768,9 @@
             </div>
           </div>
 
-          <div class="card" data-roles="secretaria,gestor">
-            <h3>Cadastrar monitor de atividade complementar</h3>
-            <form id="monitor-form" class="form-grid">
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Monitores de atividades complementares</h3>
+            <form id="monitor-form" class="grid-2">
               <label>Nome do monitor
                 <input type="text" name="monitor_name" required />
               </label>
@@ -764,24 +784,20 @@
                   <option value="Educação Infantil">Educação Infantil</option>
                   <option value="Ensino Fundamental I (1º ao 5º ano)">Ensino Fundamental I (1º ao 5º ano)</option>
                   <option value="Ensino Fundamental II (6º ao 9º ano)">Ensino Fundamental II (6º ao 9º ano)</option>
-                  <option value="EJA">EJA</option>
                 </select>
               </label>
-              <label>Unidade escolar
+              <label>Escola
                 <select id="monitor-school" name="school_id"></select>
               </label>
               <label>Carga horária semanal (h)
                 <input type="number" name="weekly_hours" min="1" value="20" required />
               </label>
-              <div class="form-actions full-span">
-                <button type="submit" class="primary">Salvar monitor</button>
+              <div style="align-self:end;">
+                <button type="submit" class="primary">Cadastrar monitor</button>
               </div>
             </form>
-          </div>
 
-          <div class="card">
-            <h3>Monitores cadastrados</h3>
-            <div class="table-wrap">
+            <div class="table-wrap" style="margin-top:14px;">
               <table>
                 <thead>
                   <tr>
@@ -790,7 +806,7 @@
                     <th>Etapa</th>
                     <th>Escola</th>
                     <th>Carga semanal</th>
-                    <th>Ação</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody id="monitors-body"></tbody>
@@ -799,32 +815,26 @@
           </div>
         </section>
 
-        <!-- CENSO ESCOLAR -->
+        <!-- PÁGINA: CENSO ESCOLAR -->
         <section id="page-censo" class="page hidden">
           <div class="stats-grid">
-            <div class="stat-card">
-              <span class="stat-label">Unidades</span>
-              <strong id="censo-schools-count" class="stat-value">0</strong>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Alunos válidos</span>
-              <strong id="censo-students-count" class="stat-value">0</strong>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Matrículas ativas</span>
-              <strong id="censo-enrollments-count" class="stat-value">0</strong>
-            </div>
+            <div class="stat-card"><strong id="censo-schools-count">0</strong><span>Unidades no escopo</span></div>
+            <div class="stat-card"><strong id="censo-students-count">0</strong><span>Alunos elegíveis</span></div>
+            <div class="stat-card"><strong id="censo-enrollments-count">0</strong><span>Matrículas ativas</span></div>
           </div>
 
-          <div class="card">
-            <div class="card-head-row">
-              <h3>Dados gerais do Censo Escolar</h3>
-              <button type="button" id="census-sync-school-data" class="secondary small">Sincronizar dados da escola</button>
+          <div class="card" style="margin-top:16px;">
+            <div class="section-head">
+              <div>
+                <h3 style="margin:0;">Mapeamento geral do Censo Escolar</h3>
+                <p class="muted small" style="margin:4px 0 0;">Atualize os dados gerais ou sincronize os campos cadastrados da unidade escolar.</p>
+              </div>
+              <button type="button" id="census-sync-school-data" class="secondary">Migrar dados da escola</button>
             </div>
 
-            <form id="census-form" class="form-grid">
-              <label>Escola vinculada
-                <select id="census-school" name="school_id"></select>
+            <form id="census-form" class="grid-2" style="margin-top:12px;">
+              <label>Unidade escolar
+                <select id="census-school" name="school_id" disabled></select>
               </label>
               <label>Ano de referência
                 <input type="number" id="census-year-input" name="census_year" required />
@@ -836,47 +846,43 @@
                   <option value="Extinta">Extinta</option>
                 </select>
               </label>
-              <label>Etapas ofertadas
-                <input type="text" id="census-offered-stages" name="offered_stages" />
-              </label>
-              <label class="full-span">Infraestrutura / Observações
-                <input type="text" id="census-infrastructure-notes" name="infrastructure_notes" />
-              </label>
-              <label>Status de conferência
+              <label>Situação de validação
                 <select id="census-validation-status" name="validation_status">
                   <option value="Pendente">Pendente</option>
                   <option value="Em conferência">Em conferência</option>
                   <option value="Validado">Validado</option>
                 </select>
               </label>
-              <div class="form-actions full-span">
-                <button type="submit" class="primary">Salvar mapeamento</button>
+              <label>Etapas ofertadas
+                <input type="text" id="census-offered-stages" name="offered_stages" />
+              </label>
+              <label>Notas de infraestrutura / internet
+                <input type="text" id="census-infrastructure-notes" name="infrastructure_notes" />
+              </label>
+              <div style="grid-column: 1 / -1;">
+                <button type="submit" class="primary">Salvar mapeamento do Censo</button>
               </div>
             </form>
           </div>
 
-          <div id="census-school-blocks-section" class="card hidden">
-            <h3>Blocos temáticos do Censo Escolar (21 blocos)</h3>
+          <div id="census-school-blocks-section" class="card hidden" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Blocos temáticos do Censo Escolar</h3>
             <p id="census-blocks-hint" class="muted small"></p>
-            <div id="census-modules-grid" class="census-grid"></div>
+            <div id="census-modules-grid" class="modules-grid" style="margin-top:12px;"></div>
 
-            <div id="census-module-editor" class="subcard hidden">
-              <div class="card-head-row">
-                <div>
-                  <h4 id="census-editor-title">Bloco</h4>
-                  <p id="census-editor-subtitle" class="muted small"></p>
-                </div>
-                <button type="button" id="census-close-editor" class="secondary small">Fechar</button>
-              </div>
-              <div id="census-module-fields" class="form-grid"></div>
-              <div class="form-actions">
+            <div id="census-module-editor" class="card hidden" style="margin-top:14px;">
+              <h4 id="census-editor-title" style="margin-top:0;">Bloco</h4>
+              <p id="census-editor-subtitle" class="muted small"></p>
+              <div id="census-module-fields" class="grid-2"></div>
+              <div style="margin-top:12px; display:flex; gap:8px;">
                 <button type="button" id="census-save-module" class="primary">Salvar bloco</button>
+                <button type="button" id="census-close-editor" class="secondary">Fechar</button>
               </div>
             </div>
           </div>
 
-          <div class="card">
-            <h3>Histórico de mapeamentos</h3>
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Histórico de mapeamentos do Censo</h3>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -884,11 +890,11 @@
                     <th>Escola</th>
                     <th>INEP</th>
                     <th>Ano</th>
-                    <th>Situação</th>
+                    <th>Funcionamento</th>
                     <th>Etapas</th>
                     <th>Blocos</th>
                     <th>Status</th>
-                    <th>Ação</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody id="census-body"></tbody>
@@ -897,107 +903,108 @@
           </div>
         </section>
 
-        <!-- RELATÓRIOS -->
+        <!-- PÁGINA: RELATÓRIOS -->
         <section id="page-relatorios" class="page hidden">
           <div class="card">
-            <div class="card-head-row">
-              <div>
-                <h3>Relatórios e indicadores</h3>
-                <p id="report-subtitle" class="muted"></p>
+            <h3 style="margin-top:0;">Relatórios e indicadores</h3>
+            <p id="report-subtitle" class="muted small">Resumo dos registros aos quais seu perfil tem acesso.</p>
+          </div>
+
+          <div id="standard-report-view" class="stats-grid" style="margin-top:16px;">
+            <div class="stat-card"><strong id="report-students">0</strong><span>Alunos</span></div>
+            <div class="stat-card"><strong id="report-classes">0</strong><span>Turmas</span></div>
+            <div class="stat-card"><strong id="report-enrollments">0</strong><span>Matrículas ativas</span></div>
+            <div class="stat-card"><strong id="report-aee">0</strong><span>Atendimento AEE</span></div>
+            <div class="stat-card"><strong id="report-pcd">0</strong><span>Alunos PcD</span></div>
+          </div>
+
+          <div id="secretaria-report-view" class="hidden" style="margin-top:16px;">
+            <div class="card">
+              <div class="section-head">
+                <h3 style="margin:0;">Indicadores gerais da rede</h3>
+                <span id="secretaria-report-year" class="badge">Ano de referência</span>
               </div>
-              <span id="secretaria-report-year" class="badge"></span>
+              <div class="stats-grid" style="margin-top:14px;">
+                <div class="stat-card"><strong id="sec-report-matriculados">0</strong><span>Alunos matriculados</span></div>
+                <div class="stat-card"><strong id="sec-report-escolas">0</strong><span>Escolas cadastradas</span></div>
+                <div class="stat-card"><strong id="sec-report-profissionais">0</strong><span>Profissionais da educação</span></div>
+                <div class="stat-card"><strong id="sec-report-alunos-unicos">0</strong><span>Alunos únicos</span></div>
+                <div class="stat-card"><strong id="sec-report-matriculas-especiais">0</strong><span>Matrículas AEE / especiais</span></div>
+                <div class="stat-card"><strong id="sec-report-mudancas-matricula">0</strong><span>Transferências / cancelamentos</span></div>
+              </div>
             </div>
 
-            <div id="standard-report-view" class="stats-grid">
-              <div class="stat-card"><span class="stat-label">Alunos</span><strong id="report-students" class="stat-value">0</strong></div>
-              <div class="stat-card"><span class="stat-label">Turmas</span><strong id="report-classes" class="stat-value">0</strong></div>
-              <div class="stat-card"><span class="stat-label">Matrículas ativas</span><strong id="report-enrollments" class="stat-value">0</strong></div>
-              <div class="stat-card"><span class="stat-label">Atendimento AEE</span><strong id="report-aee" class="stat-value">0</strong></div>
-              <div class="stat-card"><span class="stat-label">Alunos PcD</span><strong id="report-pcd" class="stat-value">0</strong></div>
-            </div>
-
-            <div id="secretaria-report-view" class="hidden">
-              <div class="stats-grid">
-                <div class="stat-card"><span class="stat-label">Alunos na rede</span><strong id="sec-report-matriculados" class="stat-value">0</strong></div>
-                <div class="stat-card"><span class="stat-label">Total de escolas</span><strong id="sec-report-escolas" class="stat-value">0</strong></div>
-                <div class="stat-card"><span class="stat-label">Profissionais</span><strong id="sec-report-profissionais" class="stat-value">0</strong></div>
-                <div class="stat-card"><span class="stat-label">Alunos únicos</span><strong id="sec-report-alunos-unicos" class="stat-value">0</strong></div>
-                <div class="stat-card"><span class="stat-label">Matrículas especiais (AEE)</span><strong id="sec-report-matriculas-especiais" class="stat-value">0</strong></div>
-                <div class="stat-card"><span class="stat-label">Transferências / Cancelamentos</span><strong id="sec-report-mudancas-matricula" class="stat-value">0</strong></div>
+            <div class="card" style="margin-top:16px;">
+              <div class="section-head">
+                <div>
+                  <h3 style="margin:0;">Monitoramento de registros de aulas por escola</h3>
+                  <p id="sec-lessons-summary" class="muted small" style="margin:4px 0 0;"></p>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <select id="sec-lessons-year"></select>
+                  <select id="sec-lessons-school"></select>
+                  <button type="button" id="sec-lessons-refresh" class="secondary small">Atualizar</button>
+                  <button type="button" id="sec-lessons-print" class="secondary small">Imprimir</button>
+                </div>
               </div>
 
-              <div class="subcard">
-                <div class="card-head-row">
+              <div class="stats-grid" style="margin-top:14px;">
+                <div class="stat-card"><strong id="sec-lessons-kpi-classes">0</strong><span>Turmas no ano</span></div>
+                <div class="stat-card"><strong id="sec-lessons-kpi-schools">0 escola(s)</strong><span>Escolas filtradas</span></div>
+                <div class="stat-card"><strong id="sec-lessons-kpi-with">0</strong><span>Com registro</span></div>
+                <div class="stat-card"><strong id="sec-lessons-kpi-without">0</strong><span>Sem registro</span></div>
+                <div class="stat-card"><strong id="sec-lessons-kpi-avg-days">0d</strong><span>Média dias sem lançamento</span></div>
+              </div>
+
+              <div class="table-wrap" style="margin-top:14px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Escola</th>
+                      <th>Status</th>
+                      <th>Turmas</th>
+                      <th>Registros</th>
+                      <th>Último lançamento</th>
+                      <th>Sem lançamento</th>
+                      <th>Detalhe</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sec-lessons-body"></tbody>
+                </table>
+              </div>
+
+              <div id="sec-lessons-school-detail" class="card hidden" style="margin-top:14px;">
+                <div class="section-head">
                   <div>
-                    <h4>Monitoramento de registros de aulas por escola</h4>
-                    <p id="sec-lessons-summary" class="muted small"></p>
+                    <h4 id="sec-lessons-detail-title" style="margin:0;">Turmas</h4>
+                    <p id="sec-lessons-detail-subtitle" class="muted small" style="margin:4px 0 0;"></p>
                   </div>
-                  <div class="filter-row">
-                    <select id="sec-lessons-year"></select>
-                    <select id="sec-lessons-school"></select>
-                    <button type="button" id="sec-lessons-refresh" class="secondary small">Atualizar</button>
-                    <button type="button" id="sec-lessons-print" class="secondary small">Imprimir</button>
-                  </div>
+                  <button type="button" id="sec-lessons-close-detail" class="secondary small">Fechar</button>
                 </div>
-
-                <div class="stats-grid">
-                  <div class="stat-card"><span class="stat-label">Turmas no ano</span><strong id="sec-lessons-kpi-classes" class="stat-value">0</strong></div>
-                  <div class="stat-card"><span class="stat-label">Escolas filtradas</span><strong id="sec-lessons-kpi-schools" class="stat-value">0</strong></div>
-                  <div class="stat-card"><span class="stat-label">Com registro</span><strong id="sec-lessons-kpi-with" class="stat-value">0</strong></div>
-                  <div class="stat-card"><span class="stat-label">Sem registro</span><strong id="sec-lessons-kpi-without" class="stat-value">0</strong></div>
-                  <div class="stat-card"><span class="stat-label">Média sem lançamento</span><strong id="sec-lessons-kpi-avg-days" class="stat-value">0d</strong></div>
-                </div>
-
-                <div class="table-wrap">
+                <div class="table-wrap" style="margin-top:10px;">
                   <table>
                     <thead>
                       <tr>
-                        <th>Escola</th>
-                        <th>Situação</th>
-                        <th>Turmas</th>
+                        <th>Turma</th>
+                        <th>Etapa / Turno</th>
                         <th>Registros</th>
-                        <th>Última aula</th>
-                        <th>Sem lançamento</th>
-                        <th>Detalhes</th>
+                        <th>Último lançamento</th>
+                        <th>Dias</th>
                       </tr>
                     </thead>
-                    <tbody id="sec-lessons-body"></tbody>
+                    <tbody id="sec-lessons-detail-body"></tbody>
                   </table>
-                </div>
-
-                <div id="sec-lessons-school-detail" class="subcard hidden">
-                  <div class="card-head-row">
-                    <div>
-                      <h4 id="sec-lessons-detail-title">Turmas</h4>
-                      <p id="sec-lessons-detail-subtitle" class="muted small"></p>
-                    </div>
-                    <button type="button" id="sec-lessons-close-detail" class="secondary small">Fechar</button>
-                  </div>
-                  <div class="table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Turma</th>
-                          <th>Etapa / Turno</th>
-                          <th>Aulas</th>
-                          <th>Última aula</th>
-                          <th>Sem lançamento</th>
-                        </tr>
-                      </thead>
-                      <tbody id="sec-lessons-detail-body"></tbody>
-                    </table>
-                  </div>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <!-- CADASTRO DE USUÁRIOS -->
+        <!-- PÁGINA: CADASTRO DE USUÁRIOS -->
         <section id="page-usuarios" class="page hidden">
           <div class="card" data-roles="secretaria">
-            <h3>Novo usuário</h3>
-            <form id="user-form" class="form-grid">
+            <h3 style="margin-top:0;">Cadastrar novo usuário</h3>
+            <form id="user-form" class="grid-2">
               <label>Nome completo
                 <input type="text" name="full_name" required />
               </label>
@@ -1020,18 +1027,16 @@
                 </select>
               </label>
               <label>Unidade escolar
-                <select id="user-school" name="school_id">
-                  <option value="">Rede / Não vinculada</option>
-                </select>
+                <select id="user-school" name="school_id"></select>
               </label>
-              <div class="form-actions full-span">
-                <button type="submit" class="primary">Criar usuário</button>
+              <div style="grid-column: 1 / -1;">
+                <button type="submit" class="primary">Cadastrar usuário</button>
               </div>
             </form>
           </div>
 
-          <div class="card">
-            <h3>Usuários cadastrados</h3>
+          <div class="card" style="margin-top:16px;">
+            <h3 style="margin-top:0;">Usuários cadastrados</h3>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -1039,8 +1044,8 @@
                     <th>Nome</th>
                     <th>CPF</th>
                     <th>Perfil</th>
-                    <th>Unidade</th>
-                    <th>Ação</th>
+                    <th>Unidade escolar</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody id="users-body"></tbody>
