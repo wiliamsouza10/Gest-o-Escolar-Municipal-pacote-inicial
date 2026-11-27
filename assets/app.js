@@ -8,7 +8,7 @@ const SUPABASE_URL = "https://xkuypxublyyrevrmaale.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_AK9mLZ12c6fUaltPDtTD2Q_oNfG6sXD";
 const CREATE_USER_FUNCTION = "create-user";
 
-// E-mails autorizados como proprietário do programa (além de profile.role === "owner" / "proprietario")
+// E-mails autorizados como proprietário do programa (além de profile.role === "owner" / "proprietario" e tabela program_owners)
 const OWNER_EMAILS = [
   "seu-email-de-dono@exemplo.com"
 ];
@@ -59,6 +59,7 @@ let currentProfile = null;
 let selectedSchoolId = "";
 let selectedMunicipality = null;
 let cachedMunicipalities = [];
+let cachedLicenseRequests = [];
 let cachedSchools = [], cachedStudents = [], cachedClasses = [], cachedEnrollments = [], cachedProfiles = [], cachedLessons = [];
 let attendanceRows = [];
 let activeLessonDetailSchoolId = null;
@@ -72,10 +73,15 @@ const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
 const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v2";
 const SCHOOL_DRAFT_CENSUS_KEY = "ge_rascunho_censo_escola_v1";
 
-function isProgramOwner() {
-  const email = String(currentProfile?.email || "").trim().toLowerCase();
-  const role = String(currentProfile?.role || "").trim().toLowerCase();
-  return role === "owner" || role === "proprietario" || (email && OWNER_EMAILS.includes(email));
+function isProgramOwner(profileObj = currentProfile) {
+  const email = String(profileObj?.email || "").trim().toLowerCase();
+  const role = String(profileObj?.role || "").trim().toLowerCase();
+  return (
+    role === "owner" ||
+    role === "proprietario" ||
+    profileObj?.is_owner === true ||
+    (email && OWNER_EMAILS.includes(email))
+  );
 }
 
 function getMunicipalityScopePrefix() {
@@ -441,19 +447,41 @@ function saveLocalJson(key, value) {
   }
 }
 
-// --- PORTAL DE CIDADES, SOLICITAÇÃO DE LICENÇA E CADASTRO EXCLUSIVO DO PROPRIETÁRIO ---
+// --- PORTAL DE CIDADES, ABA DO PROPRIETÁRIO E SOLICITAÇÃO DE LICENÇA ---
 function getActiveMunicipalityId() {
   return selectedMunicipality?.id || currentProfile?.municipality_id || "";
 }
 
-function syncOwnerCityControls() {
-  const canCreateCity = Boolean(currentProfile && isProgramOwner());
-  document.querySelectorAll("[data-owner-only-city]").forEach(el => {
-    el.classList.toggle("hidden", !canCreateCity);
-  });
-  if (!canCreateCity) {
-    $("city-register-panel")?.classList.add("hidden");
+function setPortalTab(tabName) {
+  const isOwnerTab = tabName === "owner";
+  $("tab-btn-cities")?.classList.toggle("active", !isOwnerTab);
+  $("tab-btn-owner")?.classList.toggle("active", isOwnerTab);
+  $("portal-tab-cities")?.classList.toggle("hidden", isOwnerTab);
+  $("portal-tab-owner")?.classList.toggle("hidden", !isOwnerTab);
+  syncOwnerWorkspaceView();
+  if (isOwnerTab && isProgramOwner()) {
+    loadLicenseRequestsForOwner();
   }
+}
+
+document.querySelectorAll("[data-portal-tab]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    setPortalTab(btn.dataset.portalTab);
+  });
+});
+
+function syncOwnerWorkspaceView() {
+  const ownerLoggedIn = Boolean(currentProfile && isProgramOwner());
+  $("owner-login-card")?.classList.toggle("hidden", ownerLoggedIn);
+  $("owner-workspace-card")?.classList.toggle("hidden", !ownerLoggedIn);
+
+  if (ownerLoggedIn && $("owner-session-label")) {
+    $("owner-session-label").textContent = `${currentProfile.full_name || "Proprietário"} (${currentProfile.email || ""})`;
+  }
+
+  document.querySelectorAll("[data-owner-only-city]").forEach(el => {
+    el.classList.toggle("hidden", !ownerLoggedIn);
+  });
 }
 
 function updateCityBranding() {
@@ -489,7 +517,7 @@ function updateCityBranding() {
       ? `Bem-vindo(a) ao Gestão Escolar de ${city.name}`
       : "Bem-vindo(a) ao Gestão Escolar";
   }
-  syncOwnerCityControls();
+  syncOwnerWorkspaceView();
 }
 
 function updateCityPreviewStats() {
@@ -554,11 +582,12 @@ async function loadMunicipalities() {
   renderCitySelect();
 }
 
-function showCityPortal() {
+function showCityPortal(defaultTab = "cities") {
   $("app-view")?.classList.add("hidden");
   $("login-view")?.classList.add("hidden");
   $("city-portal-view")?.classList.remove("hidden");
   if ($("city-portal-error")) $("city-portal-error").textContent = "";
+  setPortalTab(defaultTab);
   renderCitySelect();
 }
 
@@ -597,47 +626,172 @@ $("enter-selected-city-btn")?.addEventListener("click", () => {
   showLoginForSelectedCity();
 });
 
-function toggleCityRegisterPanel(forceOpen = null) {
-  if (!currentProfile || !isProgramOwner()) {
-    if ($("city-portal-error")) {
-      $("city-portal-error").textContent =
-        "O cadastro de novas cidades é exclusivo do proprietário do programa. Utilize 'Solicitar Contratação de Licença'.";
-    }
-    $("city-register-panel")?.classList.add("hidden");
-    return false;
-  }
-  const panel = $("city-register-panel");
-  if (!panel) return false;
-  const shouldOpen = forceOpen !== null ? forceOpen : panel.classList.contains("hidden");
-  panel.classList.toggle("hidden", !shouldOpen);
-  if (shouldOpen) {
-    $("license-request-panel")?.classList.add("hidden");
-    $("city-name-input")?.focus();
-  }
-  return shouldOpen;
-}
-
 $("open-city-register-btn")?.addEventListener("click", () => {
-  if (!currentProfile || !isProgramOwner()) {
-    notice("Apenas o proprietário do programa pode cadastrar cidades. Utilize 'Solicitar Contratação de Licença'.", true);
-    return;
-  }
-  showCityPortal();
-  toggleCityRegisterPanel(true);
+  showCityPortal("owner");
+  $("city-name-input")?.focus();
 });
 
-$("toggle-city-register-btn")?.addEventListener("click", () => {
-  toggleCityRegisterPanel();
+$("go-to-owner-tab-from-login")?.addEventListener("click", () => {
+  showCityPortal("owner");
+});
+
+// Login específico do Proprietário na aba "Acesso Proprietário"
+$("owner-login-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  if ($("owner-login-error")) $("owner-login-error").textContent = "";
+  if (!await requireConfig()) return;
+
+  const email = String($("owner-email")?.value || "").trim().toLowerCase();
+  const password = String($("owner-password")?.value || "");
+  if (!email || !password) {
+    if ($("owner-login-error")) $("owner-login-error").textContent = "Informe o e-mail e a senha do proprietário.";
+    return;
+  }
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data?.user) {
+      if ($("owner-login-error")) {
+        $("owner-login-error").textContent = isAuth401Error(error)
+          ? "Falha de autenticação (401): verifique a chave pública do Supabase ou o e-mail/senha."
+          : "E-mail ou senha inválidos para o acesso do proprietário.";
+      }
+      return;
+    }
+
+    const ownerCheck = await resolveOwnerProfile(data.user);
+    if (!ownerCheck.allowed) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      if ($("owner-login-error")) {
+        $("owner-login-error").textContent =
+          "Esta conta não possui permissão de proprietário do programa. Verifique OWNER_EMAILS ou a tabela program_owners.";
+      }
+      return;
+    }
+
+    currentProfile = ownerCheck.profile;
+    syncOwnerWorkspaceView();
+    if ($("owner-city-feedback")) {
+      $("owner-city-feedback").textContent = `Acesso liberado para ${currentProfile.full_name}. Preencha os dados abaixo para cadastrar a cidade.`;
+    }
+    await loadMunicipalities();
+    await loadLicenseRequestsForOwner();
+    $("city-name-input")?.focus();
+  } catch (err) {
+    console.error("Erro no login do proprietário:", formatSupabaseError(err), err);
+    if ($("owner-login-error")) {
+      $("owner-login-error").textContent = "Erro ao autenticar o proprietário. Tente novamente.";
+    }
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+});
+
+$("owner-logout-btn")?.addEventListener("click", async () => {
+  isSigningOut = true;
+  try {
+    if (supabase) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    }
+  } finally {
+    currentProfile = null;
+    isSigningOut = false;
+    syncOwnerWorkspaceView();
+    if ($("owner-city-feedback")) $("owner-city-feedback").textContent = "";
+    renderCitySelect();
+  }
+});
+
+async function loadLicenseRequestsForOwner() {
+  const container = $("owner-license-requests-list");
+  if (!container) return;
+
+  const localReqs = loadLocalJson(LICENSE_REQUESTS_STORAGE_KEY, []);
+  cachedLicenseRequests = Array.isArray(localReqs) ? localReqs : [];
+
+  if (supabase && isProgramOwner()) {
+    try {
+      const { data, error } = await supabase
+        .from("license_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (!error && Array.isArray(data)) {
+        const merged = new Map();
+        for (const r of data) merged.set(r.id, r);
+        for (const lr of cachedLicenseRequests) {
+          if (!merged.has(lr.id)) merged.set(lr.id, lr);
+        }
+        cachedLicenseRequests = Array.from(merged.values());
+        saveLocalJson(LICENSE_REQUESTS_STORAGE_KEY, cachedLicenseRequests);
+      }
+    } catch (err) {
+      console.warn("Não foi possível carregar solicitações remotas:", formatSupabaseError(err));
+    }
+  }
+
+  renderLicenseRequestsForOwner();
+}
+
+function renderLicenseRequestsForOwner() {
+  const container = $("owner-license-requests-list");
+  if (!container) return;
+
+  if (!cachedLicenseRequests.length) {
+    container.innerHTML = `<p class="muted small">Nenhuma solicitação de cidade recebida até o momento.</p>`;
+    return;
+  }
+
+  container.innerHTML = cachedLicenseRequests.map((req, idx) => {
+    const statusLabel = req.status || "pendente";
+    return `<div style="border:1px solid #d9e2ec;border-radius:8px;padding:10px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <strong>${escapeHtml(req.city_name)} - ${escapeHtml(req.state_uf)}</strong>
+        <span class="badge">${escapeHtml(statusLabel)}</span>
+      </div>
+      <div class="muted small" style="margin-top:4px;">
+        Contato: ${escapeHtml(req.contact_name)} (${escapeHtml(req.contact_email)}${req.contact_phone ? ` · ${escapeHtml(req.contact_phone)}` : ""})
+      </div>
+      ${req.notes ? `<div class="small" style="margin-top:4px;">Obs.: ${escapeHtml(req.notes)}</div>` : ""}
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="primary small" data-fill-city-req="${idx}">Preencher cadastro da cidade</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+$("owner-license-requests-list")?.addEventListener("click", e => {
+  const btn = e.target.closest("[data-fill-city-req]");
+  if (!btn) return;
+  const req = cachedLicenseRequests[Number(btn.dataset.fillCityReq)];
+  if (!req) return;
+  if ($("city-name-input")) $("city-name-input").value = req.city_name || "";
+  if ($("city-uf-input")) $("city-uf-input").value = (req.state_uf || "").toUpperCase();
+  if ($("city-ibge-input")) $("city-ibge-input").value = req.ibge_code || "";
+  if ($("city-sec-input")) $("city-sec-input").value = req.contact_name ? `Contato: ${req.contact_name}` : "";
+  if ($("owner-city-feedback")) {
+    $("owner-city-feedback").textContent = `Dados de ${req.city_name}/${req.state_uf} carregados no formulário. Clique em "Salvar e Liberar Município".`;
+  }
+  $("city-name-input")?.focus();
+});
+
+$("owner-refresh-requests-btn")?.addEventListener("click", () => {
+  loadLicenseRequestsForOwner();
 });
 
 $("city-register-form")?.addEventListener("submit", async e => {
   e.preventDefault();
   if ($("city-portal-error")) $("city-portal-error").textContent = "";
+  if ($("owner-city-feedback")) $("owner-city-feedback").textContent = "";
 
   if (!currentProfile || !isProgramOwner()) {
-    if ($("city-portal-error")) {
-      $("city-portal-error").textContent =
-        "Apenas o proprietário do programa pode cadastrar cidades após a contratação da licença.";
+    if ($("owner-city-feedback")) {
+      $("owner-city-feedback").textContent =
+        "Faça login na aba 'Acesso Proprietário' com e-mail e senha autorizados para cadastrar cidades.";
     }
     return;
   }
@@ -648,8 +802,8 @@ $("city-register-form")?.addEventListener("submit", async e => {
   const secretariatName = String($("city-sec-input")?.value || "").trim() || null;
 
   if (!name || stateUf.length !== 2) {
-    if ($("city-portal-error")) {
-      $("city-portal-error").textContent = "Informe o nome do município e a UF com 2 letras (ex.: BA, SP).";
+    if ($("owner-city-feedback")) {
+      $("owner-city-feedback").textContent = "Informe o nome do município e a UF com 2 letras (ex.: BA, SP).";
     }
     return;
   }
@@ -679,17 +833,26 @@ $("city-register-form")?.addEventListener("submit", async e => {
         .select()
         .single();
       if (error) {
-        if ($("city-portal-error")) {
-          $("city-portal-error").textContent = `Não foi possível cadastrar a cidade no banco (${formatSupabaseError(error)}).`;
+        if ($("owner-city-feedback")) {
+          $("owner-city-feedback").textContent = `Não foi possível cadastrar a cidade no banco (${formatSupabaseError(error)}).`;
         }
         return;
       }
       if (data) {
         cityRecord = { ...data, secretariat_name: secretariatName || data.secretariat_name || null };
       }
+
+      // Marca solicitações pendentes com o mesmo nome/UF como aprovadas, se existirem
+      await supabase
+        .from("license_requests")
+        .update({ status: "aprovada" })
+        .ilike("city_name", name)
+        .eq("state_uf", stateUf)
+        .eq("status", "pendente")
+        .catch(() => {});
     } catch (err) {
-      if ($("city-portal-error")) {
-        $("city-portal-error").textContent = `Erro ao cadastrar cidade (${formatSupabaseError(err)}).`;
+      if ($("owner-city-feedback")) {
+        $("owner-city-feedback").textContent = `Erro ao cadastrar cidade (${formatSupabaseError(err)}).`;
       }
       return;
     }
@@ -699,17 +862,28 @@ $("city-register-form")?.addEventListener("submit", async e => {
     .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR"));
   saveLocalJson(CITIES_STORAGE_KEY, cachedMunicipalities);
 
+  cachedLicenseRequests = cachedLicenseRequests.map(r =>
+    String(r.city_name || "").trim().toLowerCase() === name.toLowerCase() &&
+    String(r.state_uf || "").trim().toUpperCase() === stateUf
+      ? { ...r, status: "aprovada" }
+      : r
+  );
+  saveLocalJson(LICENSE_REQUESTS_STORAGE_KEY, cachedLicenseRequests);
+
   selectedMunicipality = cityRecord;
   saveLocalJson(SELECTED_CITY_STORAGE_KEY, cityRecord);
   e.target.reset();
-  toggleCityRegisterPanel(false);
   renderCitySelect();
+  renderLicenseRequestsForOwner();
+
+  if ($("owner-city-feedback")) {
+    $("owner-city-feedback").textContent = `Município "${cityRecord.name} - ${cityRecord.state_uf}" cadastrado e disponível na lista de cidades!`;
+  }
   notice(`Município "${cityRecord.name} - ${cityRecord.state_uf}" cadastrado com sucesso!`);
 });
 
 // Solicitação de contratação de licença (aberta para novos municípios solicitarem ao proprietário)
 $("open-license-request-btn")?.addEventListener("click", () => {
-  $("city-register-panel")?.classList.add("hidden");
   $("license-request-panel")?.classList.toggle("hidden");
   $("req-city-name")?.focus();
 });
@@ -764,7 +938,7 @@ $("license-request-form")?.addEventListener("submit", async e => {
 });
 
 $("back-to-city-portal-from-login")?.addEventListener("click", () => {
-  showCityPortal();
+  showCityPortal("cities");
 });
 
 $("switch-city-btn")?.addEventListener("click", async () => {
@@ -783,7 +957,7 @@ $("switch-city-btn")?.addEventListener("click", async () => {
     cachedProfiles = [];
     cachedLessons = [];
     isSigningOut = false;
-    showCityPortal();
+    showCityPortal("cities");
   }
 });
 
@@ -906,14 +1080,14 @@ function resetAppStateOnSignOut() {
   activeLessonDetailSchoolId = null;
   activeCensusModuleKey = null;
   activeDraftSchoolModuleKey = null;
-  syncOwnerCityControls();
+  syncOwnerWorkspaceView();
 
   $("app-view")?.classList.add("hidden");
   if (selectedMunicipality?.id) {
     $("login-view")?.classList.remove("hidden");
     $("city-portal-view")?.classList.add("hidden");
   } else {
-    showCityPortal();
+    showCityPortal("cities");
   }
   if ($("login-error")) $("login-error").textContent = "";
 }
@@ -955,7 +1129,7 @@ function showApp(profile, user) {
   $("avatar").textContent = (currentProfile.full_name || user.email).charAt(0).toUpperCase();
   document.querySelectorAll("[data-roles]").forEach(el => {
     const roles = el.dataset.roles.split(",");
-    const allowed = roles.includes(currentProfile.role) || (isProgramOwner() && roles.includes("secretaria"));
+    const allowed = roles.includes(currentProfile.role) || ((isSecretaria() || isProgramOwner()) && roles.includes("secretaria"));
     el.classList.toggle("hidden", !allowed);
   });
 
@@ -1021,10 +1195,68 @@ document.querySelectorAll("[data-goto]").forEach(b => b.addEventListener("click"
 
 async function requireConfig() {
   if (!configured || !supabase) {
-    $("login-error").textContent = "Configure a URL e a chave pública do Supabase em assets/app.js antes de entrar.";
+    const msg = "Configure a URL e a chave pública do Supabase em assets/app.js antes de entrar.";
+    if ($("login-error")) $("login-error").textContent = msg;
+    if ($("owner-login-error")) $("owner-login-error").textContent = msg;
     return false;
   }
   return true;
+}
+
+async function resolveOwnerProfile(user) {
+  const emailLower = String(user?.email || "").trim().toLowerCase();
+  let profileData = null;
+
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!error && data) profileData = data;
+  } catch {
+    // ignora falha de leitura de perfil
+  }
+
+  let isOwnerInTable = false;
+  try {
+    const { data: ownerRow, error: ownerErr } = await supabase
+      .from("program_owners")
+      .select("id, email, full_name, active")
+      .eq("active", true)
+      .or(`user_id.eq.${user.id},email.ilike.${emailLower}`)
+      .maybeSingle();
+    if (!ownerErr && ownerRow) {
+      isOwnerInTable = true;
+    }
+  } catch {
+    // tabela opcional caso ainda não criada
+  }
+
+  const roleLower = String(profileData?.role || "").trim().toLowerCase();
+  const allowed =
+    roleLower === "owner" ||
+    roleLower === "proprietario" ||
+    isOwnerInTable ||
+    (emailLower && OWNER_EMAILS.includes(emailLower));
+
+  if (!allowed) {
+    return { allowed: false, profile: null };
+  }
+
+  return {
+    allowed: true,
+    profile: {
+      ...(profileData || {}),
+      id: user.id,
+      email: user.email,
+      full_name: profileData?.full_name || user.email,
+      role: roleLower === "proprietario" ? "proprietario" : "owner",
+      is_owner: true,
+      municipality_id: profileData?.municipality_id || selectedMunicipality?.id || null,
+      school_id: profileData?.school_id || null
+    }
+  };
 }
 
 $("login-form")?.addEventListener("submit", async e => {
@@ -1064,6 +1296,12 @@ $("login-form")?.addEventListener("submit", async e => {
 
 async function loadProfile(user) {
   try {
+    const ownerCheck = await resolveOwnerProfile(user);
+    if (ownerCheck.allowed) {
+      showApp(ownerCheck.profile, user);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -1078,32 +1316,18 @@ async function loadProfile(user) {
       return;
     }
 
-    const emailLower = String(user.email || "").trim().toLowerCase();
-    const isOwnerLogin =
-      OWNER_EMAILS.includes(emailLower) ||
-      ["owner", "proprietario"].includes(String(data?.role || "").trim().toLowerCase());
-
-    if (!data && !isOwnerLogin) {
+    if (!data) {
       $("login-error").textContent = "Usuário autenticado, mas sem perfil institucional na tabela profiles. Solicite ao administrador a liberação do acesso.";
       return;
     }
 
-    const effectiveProfile = data || {
-      id: user.id,
-      full_name: user.email,
-      email: user.email,
-      role: "owner",
-      municipality_id: selectedMunicipality?.id || null,
-      school_id: null
-    };
-
-    if (!isOwnerLogin && selectedMunicipality?.id && effectiveProfile.municipality_id && effectiveProfile.municipality_id !== selectedMunicipality.id) {
+    if (selectedMunicipality?.id && data.municipality_id && data.municipality_id !== selectedMunicipality.id) {
       await supabase.auth.signOut({ scope: "local" }).catch(() => {});
       $("login-error").textContent = `Este usuário pertence a outro município e não pode acessar ${selectedMunicipality.name}.`;
       return;
     }
 
-    showApp(effectiveProfile, user);
+    showApp(data, user);
   } catch (err) {
     console.error("Falha inesperada em loadProfile:", formatSupabaseError(err), err);
     $("login-error").textContent = "Erro inesperado ao carregar o perfil institucional.";
@@ -1123,15 +1347,11 @@ $("logout")?.addEventListener("click", async () => {
 });
 
 if (supabase) {
-  supabase.auth.onAuthStateChange(async (event, session) => {
+  supabase.auth.onAuthStateChange(async (event) => {
     if (event === "SIGNED_OUT") {
       if (!isSigningOut && currentProfile) {
         resetAppStateOnSignOut();
       }
-      return;
-    }
-    if (event === "TOKEN_REFRESHED" && session?.user && currentProfile && session.user.id === currentProfile.id) {
-      return;
     }
   });
 
@@ -1140,21 +1360,21 @@ if (supabase) {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
         await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-        showCityPortal();
+        showCityPortal("cities");
         return;
       }
       if (data?.session?.user) {
         await loadProfile(data.session.user);
       } else {
-        showCityPortal();
+        showCityPortal("cities");
       }
     } catch {
       await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-      showCityPortal();
+      showCityPortal("cities");
     }
   });
 } else {
-  loadMunicipalities().then(() => showCityPortal());
+  loadMunicipalities().then(() => showCityPortal("cities"));
 }
 
 // --- DIRECIONAMENTO POR NOME DA ESCOLA, ID OU CÓDIGO INEP (SECRETARIA / PROPRIETÁRIO) ---
@@ -3364,21 +3584,9 @@ $("class-form")?.addEventListener("submit", async e => {
       name: String(raw.name || "").trim(),
       max_students: Number(raw.max_students) || 30,
       class_complement: String(raw.class_complement || "").trim() || null,
-      inep_code: null,
       modality: raw.modality || "Regular",
       grade_level: String(raw.grade_level || "").trim(),
-      mediation_type: raw.mediation_type || "Presencial",
-      schooling: raw.schooling || "Sim",
-      complementary_activity: raw.complementary_activity || "Não",
-      curriculum_type: raw.curriculum_type || "Comum",
-      start_time: raw.start_time || null,
-      end_time: raw.end_time || null,
-      late_tolerance: raw.late_tolerance || "Padrão do sistema",
       aee_service: raw.aee_service || "Não",
-      differentiated_location: raw.differentiated_location || "A turma não está em local de funcionamento diferenciado",
-      portuguese_second_language: raw.portuguese_second_language || "Não oferece disciplina",
-      supervised_internship: raw.supervised_internship || "Não oferece disciplina",
-      bilingual_deaf_class: raw.bilingual_deaf_class || "Não",
       shift: raw.shift || "Matutino",
       school_year: Number(raw.school_year),
       school_id: targetSchoolId,
