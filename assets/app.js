@@ -64,6 +64,8 @@ let cachedCityLicenses = [];
 let attendanceRows = [];
 let activeLessonDetailSchoolId = null;
 let isSigningOut = false;
+let activeStudentAction = "cadastrar";
+let activeStudentDocTab = "boletim";
 
 const CURRICULUM_STORAGE_KEY = "ge_matriz_curricular_v2";
 const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
@@ -560,16 +562,14 @@ function resetAppStateOnSignOut() {
   activeLessonDetailSchoolId = null;
   activeCensusModuleKey = null;
   activeDraftSchoolModuleKey = null;
+  activeStudentAction = "cadastrar";
+  activeStudentDocTab = "boletim";
 
   $("app-view")?.classList.add("hidden");
   $("login-view")?.classList.remove("hidden");
   if ($("login-error")) $("login-error").textContent = "";
 }
 
-/**
- * Verifica se o perfil e o município estão liberados (active = true) para acessar o sistema.
- * Retorna { ok: true } ou { ok: false, message: string }.
- */
 async function validateMunicipalityReleaseForProfile(profile, emailLower) {
   const isOwner = isOwnerEmail(emailLower) || profile?.role === "proprietario";
   if (isOwner) {
@@ -688,7 +688,7 @@ function go(page) {
     inicio: "Painel inicial",
     cidades: "Licenciamento de Cidades",
     escolas: "Unidades escolares",
-    alunos: "Cadastro de alunos",
+    alunos: "Estudantes",
     matriculas: "Matrículas",
     turmas: "Turmas",
     diario: "Diário de classe",
@@ -699,6 +699,9 @@ function go(page) {
   })[page] || "Gestão Escolar";
   if (page === "cidades" && isProprietario()) {
     loadCityLicenses();
+  }
+  if (page === "alunos") {
+    syncStudentModulePanels();
   }
   if (page === "diario" && canAccessDiary()) loadLessons();
   if (page === "usuarios") loadProfiles();
@@ -721,6 +724,403 @@ function go(page) {
 document.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.page)));
 document.querySelectorAll("[data-goto]").forEach(b => b.addEventListener("click", () => go(b.dataset.goto)));
 
+// --- MENU CASCATA E AÇÕES DE ESTUDANTES ---
+const studentActionLabels = {
+  cadastrar: "Cadastrar Novo Estudante",
+  alteracao_cadastro: "Alteração de Cadastro",
+  transferencia_escolas: "Alterar vínculo · Transferência entre escolas",
+  transferencia_rede: "Alterar vínculo · Transferência para outra rede",
+  boletim: "Documentos · Boletim do aluno",
+  historico: "Documentos · Histórico Escolar"
+};
+
+function closeStudentCascadeMenu() {
+  const menu = $("student-cascade-menu");
+  const btn = $("student-cascade-toggle");
+  if (menu) menu.classList.add("hidden");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function toggleStudentCascadeMenu() {
+  const menu = $("student-cascade-menu");
+  const btn = $("student-cascade-toggle");
+  if (!menu) return;
+  const willOpen = menu.classList.contains("hidden");
+  menu.classList.toggle("hidden", !willOpen);
+  if (btn) btn.setAttribute("aria-expanded", String(willOpen));
+}
+
+function populateStudentActionSelects(scopedStudents = getScopedStudents()) {
+  const editSelect = $("edit-student-select");
+  const transferSelect = $("transfer-student-select");
+  const docSelect = $("doc-student-select");
+  const targetSchoolSelect = $("transfer-target-school");
+
+  const studentOptions = `<option value="">Selecione</option>` +
+    scopedStudents.map(s =>
+      `<option value="${escapeHtml(s.id)}">${escapeHtml(s.full_name)}${s.schools?.name ? ` (${escapeHtml(s.schools.name)})` : ""}</option>`
+    ).join("");
+
+  if (editSelect) {
+    const prev = editSelect.value;
+    editSelect.innerHTML = studentOptions;
+    if (scopedStudents.some(s => s.id === prev)) editSelect.value = prev;
+  }
+
+  if (transferSelect) {
+    const prev = transferSelect.value;
+    transferSelect.innerHTML = studentOptions;
+    if (scopedStudents.some(s => s.id === prev)) transferSelect.value = prev;
+  }
+
+  if (docSelect) {
+    const prev = docSelect.value;
+    docSelect.innerHTML = studentOptions;
+    if (scopedStudents.some(s => s.id === prev)) docSelect.value = prev;
+  }
+
+  if (targetSchoolSelect) {
+    const prevSchool = targetSchoolSelect.value;
+    const currentOriginSchoolId = getEffectiveSchoolId();
+    const destinations = cachedSchools.filter(s => s.id !== currentOriginSchoolId);
+    targetSchoolSelect.innerHTML = `<option value="">Selecione a escola destino</option>` +
+      destinations.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(formatSchoolOption(s))}</option>`).join("");
+    if (destinations.some(s => s.id === prevSchool)) targetSchoolSelect.value = prevSchool;
+  }
+}
+
+function loadStudentIntoEditForm(studentId) {
+  const stu = cachedStudents.find(s => s.id === studentId);
+  if (!stu) return;
+  if ($("edit-student-name")) $("edit-student-name").value = stu.full_name || "";
+  if ($("edit-student-cpf")) $("edit-student-cpf").value = stu.cpf ? formatCpf(stu.cpf) : "";
+  if ($("edit-student-birth")) $("edit-student-birth").value = stu.birth_date ? String(stu.birth_date).slice(0, 10) : "";
+  if ($("edit-student-race")) $("edit-student-race").value = stu.race_color || "Não declarada";
+  if ($("edit-student-pcd")) $("edit-student-pcd").value = isPcdStudent(stu) ? "true" : "false";
+  if ($("edit-student-guardian")) $("edit-student-guardian").value = stu.guardian_name || "";
+  if ($("edit-student-phone")) $("edit-student-phone").value = stu.guardian_phone || "";
+  if ($("edit-student-notes")) $("edit-student-notes").value = stu.notes || "";
+}
+
+function syncTransferTypeFields(transferType) {
+  const isNetworkTransfer = transferType === "outra_rede";
+  $("transfer-target-school-wrap")?.classList.toggle("hidden", isNetworkTransfer);
+  $("transfer-target-network-wrap")?.classList.toggle("hidden", !isNetworkTransfer);
+  if ($("transfer-target-school")) $("transfer-target-school").required = !isNetworkTransfer;
+  if ($("transfer-target-network")) $("transfer-target-network").required = isNetworkTransfer;
+}
+
+function renderStudentDocumentPreview() {
+  const container = $("student-doc-preview");
+  if (!container) return;
+
+  const studentId = $("doc-student-select")?.value || "";
+  if (!studentId) {
+    container.innerHTML = `<p class="muted small">Selecione um estudante para visualizar o ${activeStudentDocTab === "historico" ? "Histórico Escolar" : "Boletim do aluno"}.</p>`;
+    return;
+  }
+
+  const stu = cachedStudents.find(s => s.id === studentId);
+  if (!stu) {
+    container.innerHTML = `<p class="muted small">Estudante não encontrado.</p>`;
+    return;
+  }
+
+  const studentEnrollments = cachedEnrollments.filter(e => e.student_id === studentId);
+  const classMap = new Map(cachedClasses.map(c => [c.id, c]));
+  const schoolName = stu.schools?.name || cachedSchools.find(s => s.id === stu.school_id)?.name || "—";
+
+  if ($("student-doc-title")) {
+    $("student-doc-title").textContent = activeStudentDocTab === "historico"
+      ? `Histórico Escolar — ${stu.full_name}`
+      : `Boletim do aluno — ${stu.full_name}`;
+  }
+
+  const headerHtml = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;border-bottom:1px solid #cbd5e1;padding-bottom:10px;margin-bottom:12px;">
+      <div>
+        <strong style="font-size:1rem;">${escapeHtml(stu.full_name)}</strong>
+        <p class="muted small" style="margin:2px 0 0;">CPF: ${escapeHtml(formatCpf(stu.cpf))} · Nascimento: ${escapeHtml(formatBrDate(stu.birth_date))} · Raça/Cor: ${escapeHtml(stu.race_color || "Não declarada")} · PcD: ${isPcdStudent(stu) ? "Sim" : "Não"}</p>
+        <p class="muted small" style="margin:2px 0 0;">Unidade atual: ${escapeHtml(schoolName)}</p>
+      </div>
+      <button type="button" class="secondary small" id="btn-print-student-doc">Imprimir documento</button>
+    </div>
+  `;
+
+  if (activeStudentDocTab === "historico") {
+    const historyRows = studentEnrollments.length
+      ? studentEnrollments.map(en => {
+          const cls = en.classes || classMap.get(en.class_id);
+          const modality = isAeeClass(cls) ? "AEE" : (cls?.modality || "Regular");
+          return `<tr>
+            <td>${escapeHtml(String(en.school_year || "—"))}</td>
+            <td>${escapeHtml(cls?.grade_level || "—")}</td>
+            <td>${escapeHtml(cls?.name || "—")}</td>
+            <td>${escapeHtml(modality)}</td>
+            <td>${escapeHtml(en.status || "—")}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="5">Nenhum vínculo letivo registrado para este estudante até o momento.</td></tr>`;
+
+    container.innerHTML = headerHtml + `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Ano Letivo</th><th>Etapa de Ensino</th><th>Turma</th><th>Modalidade</th><th>Situação</th></tr>
+          </thead>
+          <tbody>${historyRows}</tbody>
+        </table>
+      </div>
+    `;
+  } else {
+    const boletimRows = studentEnrollments.length
+      ? studentEnrollments.map(en => {
+          const cls = en.classes || classMap.get(en.class_id);
+          const tipoTurma = isAeeClass(cls) ? "Atendimento Educacional Especializado (AEE)" : "Ensino Regular";
+          const aulasCount = cachedLessons.filter(l => l.class_id === en.class_id).length;
+          return `<tr>
+            <td>${escapeHtml(cls?.name || "—")}</td>
+            <td>${escapeHtml(tipoTurma)}</td>
+            <td>${escapeHtml(String(en.school_year || "—"))}</td>
+            <td>${formatCount(aulasCount)} aula(s) no diário</td>
+            <td>${escapeHtml(en.status || "—")}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="5">Nenhuma matrícula encontrada para emissão do boletim.</td></tr>`;
+
+    container.innerHTML = headerHtml + `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Turma</th><th>Tipo de Atendimento</th><th>Ano Letivo</th><th>Registros de Aula</th><th>Situação</th></tr>
+          </thead>
+          <tbody>${boletimRows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  $("btn-print-student-doc")?.addEventListener("click", () => window.print());
+}
+
+function setStudentAction(action) {
+  if (action === "alterar_vinculo_menu") {
+    action = "transferencia_escolas";
+  }
+  if (action === "documentos_menu") {
+    action = activeStudentDocTab || "boletim";
+  }
+
+  activeStudentAction = action;
+  closeStudentCascadeMenu();
+
+  $("student-panel-cadastrar")?.classList.toggle("hidden", action !== "cadastrar");
+  $("student-panel-alteracao")?.classList.toggle("hidden", action !== "alteracao_cadastro");
+  $("student-panel-vinculo")?.classList.toggle("hidden", action !== "transferencia_escolas" && action !== "transferencia_rede");
+  $("student-panel-documentos")?.classList.toggle("hidden", action !== "boletim" && action !== "historico");
+
+  if ($("student-active-action-badge")) {
+    $("student-active-action-badge").textContent = `Ação ativa: ${studentActionLabels[action] || "Cadastrar Novo Estudante"}`;
+  }
+
+  if (action === "transferencia_escolas" || action === "transferencia_rede") {
+    const typeVal = action === "transferencia_rede" ? "outra_rede" : "entre_escolas";
+    if ($("student-transfer-type")) $("student-transfer-type").value = typeVal;
+    if ($("transfer-date") && !$("transfer-date").value) $("transfer-date").value = today;
+    syncTransferTypeFields(typeVal);
+    if ($("student-vinculo-title")) {
+      $("student-vinculo-title").textContent = typeVal === "outra_rede"
+        ? "Transferência para outra rede"
+        : "Transferência entre escolas";
+    }
+    if ($("student-vinculo-desc")) {
+      $("student-vinculo-desc").textContent = typeVal === "outra_rede"
+        ? "Registre a transferência do estudante para rede estadual, particular ou outro município."
+        : "Transfira o estudante para outra unidade escolar da rede municipal.";
+    }
+  }
+
+  if (action === "boletim" || action === "historico") {
+    activeStudentDocTab = action;
+    $("btn-doc-boletim")?.classList.toggle("primary", activeStudentDocTab === "boletim");
+    $("btn-doc-boletim")?.classList.toggle("secondary", activeStudentDocTab !== "boletim");
+    $("btn-doc-historico")?.classList.toggle("primary", activeStudentDocTab === "historico");
+    $("btn-doc-historico")?.classList.toggle("secondary", activeStudentDocTab !== "historico");
+    renderStudentDocumentPreview();
+  }
+}
+
+function syncStudentModulePanels() {
+  populateStudentActionSelects();
+  setStudentAction(activeStudentAction);
+}
+
+$("student-cascade-toggle")?.addEventListener("click", e => {
+  e.stopPropagation();
+  toggleStudentCascadeMenu();
+});
+
+$("student-cascade-menu")?.addEventListener("click", e => {
+  const btn = e.target.closest("[data-student-action]");
+  if (!btn) return;
+  e.stopPropagation();
+  setStudentAction(btn.dataset.studentAction);
+});
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".student-menu-wrap")) {
+    closeStudentCascadeMenu();
+  }
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    closeStudentCascadeMenu();
+  }
+});
+
+$("edit-student-select")?.addEventListener("change", e => {
+  loadStudentIntoEditForm(e.target.value);
+});
+
+$("student-edit-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!isSchoolUnitProfile()) {
+    notice("Apenas Gestor escolar e Secretário escolar podem alterar o cadastro de estudantes.", true);
+    return;
+  }
+
+  const raw = formObject(e.target);
+  const studentId = raw.student_id;
+  if (!studentId) {
+    notice("Selecione um estudante para alterar o cadastro.", true);
+    return;
+  }
+
+  const cpfCheck = validateAndNormalizeCpf(raw.cpf, "CPF do estudante");
+  if (!cpfCheck.valid) {
+    notice(cpfCheck.error, true);
+    return;
+  }
+
+  if (cpfCheck.cpf && cachedStudents.some(s => s.id !== studentId && normalizeCpf(s.cpf) === cpfCheck.cpf)) {
+    notice("Já existe outro estudante cadastrado com este CPF.", true);
+    return;
+  }
+
+  const payload = {
+    full_name: String(raw.full_name || "").trim(),
+    cpf: cpfCheck.cpf,
+    birth_date: raw.birth_date || null,
+    race_color: String(raw.race_color || "Não declarada").trim() || "Não declarada",
+    is_pcd: raw.is_pcd === "true" || raw.is_pcd === true,
+    guardian_name: String(raw.guardian_name || "").trim() || null,
+    guardian_phone: String(raw.guardian_phone || "").trim() || null,
+    notes: String(raw.notes || "").trim() || null
+  };
+
+  try {
+    const { error } = await supabase
+      .from("students")
+      .update(payload)
+      .eq("id", studentId);
+    if (error) throw error;
+    notice("Cadastro do estudante atualizado com sucesso.");
+    await loadAll();
+    syncStudentModulePanels();
+  } catch (err) {
+    console.error("Erro ao alterar cadastro do estudante:", formatSupabaseError(err), err);
+    notice(`Não foi possível atualizar o cadastro (${formatSupabaseError(err)}).`, true);
+  }
+});
+
+$("student-transfer-type")?.addEventListener("change", e => {
+  const val = e.target.value;
+  syncTransferTypeFields(val);
+  setStudentAction(val === "outra_rede" ? "transferencia_rede" : "transferencia_escolas");
+});
+
+$("student-transfer-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!isSchoolUnitProfile()) {
+    notice("Apenas Gestor escolar e Secretário escolar podem alterar o vínculo de estudantes.", true);
+    return;
+  }
+
+  const raw = formObject(e.target);
+  const studentId = raw.student_id;
+  const transferType = raw.transfer_type || "entre_escolas";
+  const transferDate = raw.transfer_date || today;
+  const reason = String(raw.transfer_notes || "").trim();
+
+  if (!studentId) {
+    notice("Selecione um estudante para alterar o vínculo.", true);
+    return;
+  }
+
+  const stu = cachedStudents.find(s => s.id === studentId);
+  if (!stu) {
+    notice("Estudante não encontrado.", true);
+    return;
+  }
+
+  try {
+    if (transferType === "entre_escolas") {
+      const targetSchoolId = raw.target_school_id;
+      if (!targetSchoolId) {
+        notice("Selecione a escola de destino para transferência entre escolas.", true);
+        return;
+      }
+      if (targetSchoolId === stu.school_id) {
+        notice("A escola de destino deve ser diferente da escola atual do estudante.", true);
+        return;
+      }
+      const targetSchool = cachedSchools.find(s => s.id === targetSchoolId);
+      const transferLog = `Transferido entre escolas em ${formatBrDate(transferDate)} para ${targetSchool?.name || "outra unidade"}${reason ? ` (${reason})` : ""}.`;
+      const combinedNotes = [stu.notes, transferLog].filter(Boolean).join(" | ").slice(0, 250);
+
+      const { error } = await supabase
+        .from("students")
+        .update({ school_id: targetSchoolId, notes: combinedNotes })
+        .eq("id", studentId);
+      if (error) throw error;
+
+      e.target.reset();
+      if ($("transfer-date")) $("transfer-date").value = today;
+      notice(`Transferência entre escolas concluída para ${targetSchool?.name || "a escola destino"}.`);
+      await loadAll();
+      syncStudentModulePanels();
+    } else {
+      const targetNetwork = String(raw.target_network || "").trim();
+      if (!targetNetwork) {
+        notice("Informe a rede ou instituição de destino.", true);
+        return;
+      }
+      const transferLog = `Transferência para outra rede (${targetNetwork}) em ${formatBrDate(transferDate)}${reason ? ` - ${reason}` : ""}.`;
+      const combinedNotes = [stu.notes, transferLog].filter(Boolean).join(" | ").slice(0, 250);
+
+      const { error } = await supabase
+        .from("students")
+        .update({ notes: combinedNotes })
+        .eq("id", studentId);
+      if (error) throw error;
+
+      e.target.reset();
+      if ($("transfer-date")) $("transfer-date").value = today;
+      notice(`Transferência para outra rede (${targetNetwork}) registrada para ${stu.full_name}.`);
+      await loadAll();
+      syncStudentModulePanels();
+    }
+  } catch (err) {
+    console.error("Erro ao alterar vínculo do estudante:", formatSupabaseError(err), err);
+    notice(`Não foi possível alterar o vínculo (${formatSupabaseError(err)}).`, true);
+  }
+});
+
+$("btn-doc-boletim")?.addEventListener("click", () => setStudentAction("boletim"));
+$("btn-doc-historico")?.addEventListener("click", () => setStudentAction("historico"));
+$("doc-student-select")?.addEventListener("change", renderStudentDocumentPreview);
+
 async function requireConfig() {
   if (!configured || !supabase) {
     $("login-error").textContent = "Configure a URL e a chave pública do Supabase em assets/app.js antes de entrar.";
@@ -738,7 +1138,6 @@ $("login-form")?.addEventListener("submit", async e => {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
-    // Limpa eventual sessão anterior apenas na aba atual antes de autenticar o novo usuário
     await supabase.auth.signOut({ scope: "local" }).catch(() => {});
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -777,7 +1176,6 @@ async function loadProfile(user) {
       return;
     }
 
-    // Se o e-mail autenticado for o do proprietário do programa, libera acesso mesmo sem registro prévio na tabela profiles
     if (!data && isOwnerEmail(emailLower)) {
       showApp({
         id: user.id,
@@ -815,7 +1213,6 @@ $("logout")?.addEventListener("click", async () => {
   isSigningOut = true;
   try {
     if (supabase) {
-      // Encerra somente a sessão local desta aba/dispositivo sem derrubar outros acessos simultâneos
       await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     }
   } finally {
@@ -1852,6 +2249,7 @@ function applySchoolScope() {
   renderReportSection();
   renderSchools(scopedSchools);
   renderStudents(scopedStudents);
+  syncStudentModulePanels();
   if (canManageClassesAndEnrollments()) {
     renderClasses(scopedClasses);
     renderEnrollments(scopedEnrollments);
@@ -2683,7 +3081,7 @@ $("monitors-body")?.addEventListener("click", e => {
   notice("Monitor removido.");
 });
 
-// --- MAPEAMENTO DO CENSO ESCOLAR (MIGRAÇÃO COMPLETA E EDIÇÃO PARA SECRETÁRIO ESCOLAR E GESTOR ESCOLAR) ---
+// --- MAPEAMENTO DO CENSO ESCOLAR ---
 function getSelectedCensusSchoolId() {
   if (!canAccessCensus()) return "";
   return currentProfile?.school_id || "";
