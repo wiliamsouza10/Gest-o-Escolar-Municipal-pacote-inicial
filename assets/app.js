@@ -920,6 +920,30 @@ async function syncMunicipalityActiveFlag(item, isActive) {
   }
 }
 
+async function provisionCityAdminAccount(licenseItem, adminPassword) {
+  if (!supabase || !licenseItem?.admin_email || !adminPassword) {
+    return { provisioned: false, reason: "missing_params" };
+  }
+
+  try {
+    await callUserFunction({
+      action: "provision_city_admin",
+      full_name: String(licenseItem.contact_name || "").trim() || `Secretaria de Educação - ${licenseItem.city_name}`,
+      email: licenseItem.admin_email,
+      password: adminPassword,
+      role: "secretaria",
+      municipality_id: licenseItem.municipality_id || null,
+      city_name: licenseItem.city_name,
+      state_uf: licenseItem.state_uf,
+      license_id: licenseItem.id
+    });
+    return { provisioned: true };
+  } catch (err) {
+    console.warn("Provisionamento automático de conta do município não concluído:", formatSupabaseError(err));
+    return { provisioned: false, error: formatSupabaseError(err) };
+  }
+}
+
 function renderCityLicenses() {
   if (!isProprietario() || !$("cities-body")) return;
 
@@ -1041,9 +1065,15 @@ $("city-license-form")?.addEventListener("submit", async e => {
   const cityName = String(raw.city_name || "").trim();
   const stateUf = String(raw.state_uf || "").trim().toUpperCase();
   const adminEmail = String(raw.admin_email || "").trim().toLowerCase();
+  const adminPassword = String(raw.admin_password || "");
 
   if (!cityName || !stateUf || !adminEmail) {
     notice("Preencha o município, estado (UF) e e-mail do administrador da cidade.", true);
+    return;
+  }
+
+  if (adminPassword.length < 6) {
+    notice("Defina uma senha para login com no mínimo 6 caracteres.", true);
     return;
   }
 
@@ -1101,17 +1131,23 @@ $("city-license-form")?.addEventListener("submit", async e => {
       await syncMunicipalityActiveFlag(newLicense, isActiveMunicipality);
     }
 
+    const accountResult = await provisionCityAdminAccount(newLicense, adminPassword);
+
     cachedCityLicenses = [newLicense, ...cachedCityLicenses];
     saveLocalJson(CITY_LICENSES_STORAGE_KEY, cachedCityLicenses);
     e.target.reset();
     if (e.target.elements["max_schools"]) e.target.elements["max_schools"].value = "50";
     if (e.target.elements["status"]) e.target.elements["status"].value = "ativa";
     renderCityLicenses();
-    notice(
-      isActiveMunicipality
-        ? `Licença liberada com sucesso para ${cityName} - ${stateUf}! Município ativo para login.`
-        : `Licença cadastrada para ${cityName} - ${stateUf} com status "${licenseStatus}".`
-    );
+
+    if (accountResult.provisioned) {
+      notice(`Licença liberada para ${cityName} - ${stateUf} e acesso de login criado/atualizado para ${adminEmail}.`);
+    } else {
+      notice(
+        `Licença registrada para ${cityName} - ${stateUf} com senha informada para ${adminEmail}. Se o login ainda não existir no Supabase Auth, configure/ative o suporte no backend do Supabase.`,
+        false
+      );
+    }
   } catch (err) {
     console.error("Erro ao cadastrar licença da cidade:", formatSupabaseError(err), err);
     notice(`Não foi possível salvar a licença (${formatSupabaseError(err)}).`, true);
