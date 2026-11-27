@@ -342,6 +342,16 @@ function formatCount(value) {
   return Number(value || 0).toLocaleString("pt-BR");
 }
 
+function slugifyMunicipality(name, stateUf) {
+  const base = `${name || ""}-${stateUf || ""}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return base || `municipio-${Date.now()}`;
+}
+
 function generateFourDigitCode(existingList, fieldName) {
   const existingCodes = new Set(
     existingList
@@ -556,6 +566,58 @@ function resetAppStateOnSignOut() {
   if ($("login-error")) $("login-error").textContent = "";
 }
 
+/**
+ * Verifica se o perfil e o município estão liberados (active = true) para acessar o sistema.
+ * Retorna { ok: true } ou { ok: false, message: string }.
+ */
+async function validateMunicipalityReleaseForProfile(profile, emailLower) {
+  const isOwner = isOwnerEmail(emailLower) || profile?.role === "proprietario";
+  if (isOwner) {
+    return { ok: true };
+  }
+
+  if (profile?.active === false) {
+    return {
+      ok: false,
+      message: "Seu usuário está desativado no sistema. Fale com a Secretaria de Educação."
+    };
+  }
+
+  if (!profile?.municipality_id) {
+    return {
+      ok: false,
+      message: "Seu perfil não está vinculado a um município liberado. Solicite a liberação do município ao proprietário do programa."
+    };
+  }
+
+  if (!supabase) {
+    return { ok: true };
+  }
+
+  const { data: municipality, error } = await supabase
+    .from("municipalities")
+    .select("id, name, state_uf, active")
+    .eq("id", profile.municipality_id)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Erro ao verificar liberação do município:", formatSupabaseError(error));
+    return {
+      ok: false,
+      message: "Não foi possível confirmar se o município está liberado no momento."
+    };
+  }
+
+  if (!municipality || municipality.active !== true) {
+    return {
+      ok: false,
+      message: "Acesso bloqueado: este município ainda não está liberado ou encontra-se suspenso."
+    };
+  }
+
+  return { ok: true };
+}
+
 function showApp(profile, user) {
   currentAuthEmail = String(user?.email || "").trim().toLowerCase();
   const ownerAccess = isOwnerEmail(currentAuthEmail) || profile?.role === "proprietario";
@@ -717,13 +779,24 @@ async function loadProfile(user) {
         id: user.id,
         full_name: user.user_metadata?.full_name || "Proprietário do Sistema",
         role: "proprietario",
-        school_id: null
+        municipality_id: null,
+        school_id: null,
+        active: true
       }, user);
       return;
     }
 
     if (!data) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
       $("login-error").textContent = "Usuário autenticado, mas sem perfil institucional na tabela profiles. Solicite ao administrador a liberação do acesso.";
+      return;
+    }
+
+    const releaseCheck = await validateMunicipalityReleaseForProfile(data, emailLower);
+    if (!releaseCheck.ok) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      resetAppStateOnSignOut();
+      $("login-error").textContent = releaseCheck.message;
       return;
     }
 
@@ -756,7 +829,12 @@ if (supabase) {
       return;
     }
     if (event === "TOKEN_REFRESHED" && session?.user && currentProfile && session.user.id === currentProfile.id) {
-      return;
+      const check = await validateMunicipalityReleaseForProfile(currentProfile, session.user.email);
+      if (!check.ok) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        resetAppStateOnSignOut();
+        notice(check.message, true);
+      }
     }
   });
 
@@ -788,6 +866,54 @@ function getEffectiveLicenseStatus(item) {
     return "expirada";
   }
   return item.status || "ativa";
+}
+
+async function syncMunicipalityActiveFlag(item, isActive) {
+  if (!supabase || !item) return;
+  try {
+    const cleanCity = String(item.city_name || "").trim();
+    const cleanUf = String(item.state_uf || "").trim().toUpperCase();
+    const slug = item.slug || slugifyMunicipality(cleanCity, cleanUf);
+
+    if (item.municipality_id) {
+      await supabase
+        .from("municipalities")
+        .update({ active: Boolean(isActive) })
+        .eq("id", item.municipality_id);
+      return;
+    }
+
+    const { data: existingMun } = await supabase
+      .from("municipalities")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (existingMun?.id) {
+      item.municipality_id = existingMun.id;
+      await supabase
+        .from("municipalities")
+        .update({ active: Boolean(isActive) })
+        .eq("id", existingMun.id);
+    } else if (isActive && cleanCity && cleanUf) {
+      const { data: createdMun } = await supabase
+        .from("municipalities")
+        .insert({
+          name: cleanCity,
+          state_uf: cleanUf,
+          ibge_code: item.ibge_code || null,
+          slug,
+          active: true
+        })
+        .select("id")
+        .single();
+      if (createdMun?.id) {
+        item.municipality_id = createdMun.id;
+      }
+    }
+  } catch (err) {
+    console.warn("Não foi possível sincronizar tabela municipalities:", formatSupabaseError(err));
+  }
 }
 
 function renderCityLicenses() {
@@ -849,13 +975,51 @@ async function loadCityLicenses() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(500);
-      if (error) throw error;
-      if (Array.isArray(data)) {
+      if (!error && Array.isArray(data) && data.length) {
         cachedCityLicenses = data;
         saveLocalJson(CITY_LICENSES_STORAGE_KEY, cachedCityLicenses);
       }
     } catch (err) {
-      console.warn("Tabela city_licenses ainda não disponível no Supabase (usando cache local):", formatSupabaseError(err));
+      console.warn("Tabela city_licenses ainda não disponível no Supabase (usando cache local/municipalities):", formatSupabaseError(err));
+    }
+
+    try {
+      const { data: munRows, error: munErr } = await supabase
+        .from("municipalities")
+        .select("id, name, state_uf, ibge_code, slug, active, created_at")
+        .order("name", { ascending: true });
+      if (!munErr && Array.isArray(munRows)) {
+        const bySlug = new Map(cachedCityLicenses.map(c => [c.slug || slugifyMunicipality(c.city_name, c.state_uf), c]));
+        for (const m of munRows) {
+          const existing = bySlug.get(m.slug);
+          if (existing) {
+            existing.municipality_id = m.id;
+            existing.slug = m.slug;
+            if (!m.active && existing.status === "ativa") {
+              existing.status = "suspensa";
+            }
+          } else {
+            bySlug.set(m.slug, {
+              id: `mun-${m.id}`,
+              municipality_id: m.id,
+              city_name: m.name,
+              state_uf: m.state_uf,
+              ibge_code: m.ibge_code || null,
+              slug: m.slug,
+              cnpj: null,
+              admin_email: "—",
+              max_schools: 50,
+              expires_at: null,
+              status: m.active ? "ativa" : "suspensa",
+              created_at: m.created_at || new Date().toISOString()
+            });
+          }
+        }
+        cachedCityLicenses = Array.from(bySlug.values());
+        saveLocalJson(CITY_LICENSES_STORAGE_KEY, cachedCityLicenses);
+      }
+    } catch (err) {
+      console.warn("Não foi possível mesclar municipalities:", formatSupabaseError(err));
     }
   }
 
@@ -879,18 +1043,22 @@ $("city-license-form")?.addEventListener("submit", async e => {
     return;
   }
 
+  const licenseStatus = raw.status || "ativa";
+  const isActiveMunicipality = licenseStatus === "ativa" && (!raw.expires_at || String(raw.expires_at).slice(0, 10) >= today);
+
   const newLicense = {
     id: `lic-${Date.now()}`,
     city_name: cityName,
     state_uf: stateUf,
     ibge_code: String(raw.ibge_code || "").replace(/\D/g, "") || null,
+    slug: slugifyMunicipality(cityName, stateUf),
     cnpj: String(raw.cnpj || "").trim() || null,
     admin_email: adminEmail,
     contact_name: String(raw.contact_name || "").trim() || null,
     contact_phone: String(raw.contact_phone || "").trim() || null,
     max_schools: Number(raw.max_schools) || 50,
     expires_at: raw.expires_at,
-    status: raw.status || "ativa",
+    status: licenseStatus,
     notes: String(raw.notes || "").trim() || null,
     owner_email: currentAuthEmail,
     created_at: new Date().toISOString()
@@ -923,8 +1091,10 @@ $("city-license-form")?.addEventListener("submit", async e => {
       if (!error && data) {
         newLicense.id = data.id;
       } else if (error) {
-        console.warn("Não foi possível gravar na tabela city_licenses (salvo localmente):", formatSupabaseError(error));
+        console.warn("Não foi possível gravar na tabela city_licenses:", formatSupabaseError(error));
       }
+
+      await syncMunicipalityActiveFlag(newLicense, isActiveMunicipality);
     }
 
     cachedCityLicenses = [newLicense, ...cachedCityLicenses];
@@ -933,7 +1103,11 @@ $("city-license-form")?.addEventListener("submit", async e => {
     if (e.target.elements["max_schools"]) e.target.elements["max_schools"].value = "50";
     if (e.target.elements["status"]) e.target.elements["status"].value = "ativa";
     renderCityLicenses();
-    notice(`Licença liberada com sucesso para ${cityName} - ${stateUf}!`);
+    notice(
+      isActiveMunicipality
+        ? `Licença liberada com sucesso para ${cityName} - ${stateUf}! Município ativo para login.`
+        : `Licença cadastrada para ${cityName} - ${stateUf} com status "${licenseStatus}".`
+    );
   } catch (err) {
     console.error("Erro ao cadastrar licença da cidade:", formatSupabaseError(err), err);
     notice(`Não foi possível salvar a licença (${formatSupabaseError(err)}).`, true);
@@ -954,7 +1128,7 @@ $("cities-body")?.addEventListener("click", async e => {
 
     toggleBtn.disabled = true;
     try {
-      if (supabase && !String(id).startsWith("lic-")) {
+      if (supabase && !String(id).startsWith("lic-") && !String(id).startsWith("mun-")) {
         const { error } = await supabase
           .from("city_licenses")
           .update({ status: nextStatus })
@@ -962,6 +1136,7 @@ $("cities-body")?.addEventListener("click", async e => {
         if (error) console.warn("Falha ao atualizar status no Supabase:", formatSupabaseError(error));
       }
       target.status = nextStatus;
+      await syncMunicipalityActiveFlag(target, nextStatus === "ativa");
       saveLocalJson(CITY_LICENSES_STORAGE_KEY, cachedCityLicenses);
       renderCityLicenses();
       notice(`Status da licença de ${target.city_name} alterado para "${nextStatus}".`);
@@ -986,7 +1161,7 @@ $("cities-body")?.addEventListener("click", async e => {
 
     renewBtn.disabled = true;
     try {
-      if (supabase && !String(id).startsWith("lic-")) {
+      if (supabase && !String(id).startsWith("lic-") && !String(id).startsWith("mun-")) {
         const { error } = await supabase
           .from("city_licenses")
           .update({ expires_at: nextExpires, status: "ativa" })
@@ -995,6 +1170,7 @@ $("cities-body")?.addEventListener("click", async e => {
       }
       target.expires_at = nextExpires;
       target.status = "ativa";
+      await syncMunicipalityActiveFlag(target, true);
       saveLocalJson(CITY_LICENSES_STORAGE_KEY, cachedCityLicenses);
       renderCityLicenses();
       notice(`Licença de ${target.city_name} renovada até ${formatBrDate(nextExpires)}.`);
@@ -1012,17 +1188,21 @@ $("cities-body")?.addEventListener("click", async e => {
 
     delBtn.disabled = true;
     try {
-      if (supabase && !String(id).startsWith("lic-")) {
+      const target = cachedCityLicenses.find(c => c.id === id);
+      if (supabase && !String(id).startsWith("lic-") && !String(id).startsWith("mun-")) {
         const { error } = await supabase
           .from("city_licenses")
           .delete()
           .eq("id", id);
         if (error) console.warn("Falha ao excluir licença no Supabase:", formatSupabaseError(error));
       }
+      if (target) {
+        await syncMunicipalityActiveFlag(target, false);
+      }
       cachedCityLicenses = cachedCityLicenses.filter(c => c.id !== id);
       saveLocalJson(CITY_LICENSES_STORAGE_KEY, cachedCityLicenses);
       renderCityLicenses();
-      notice(`Licença de "${cityName}" removida.`);
+      notice(`Licença de "${cityName}" removida e acesso do município suspenso.`);
     } finally {
       delBtn.disabled = false;
     }
@@ -1700,6 +1880,14 @@ async function loadAll() {
     return;
   }
 
+  const releaseCheck = await validateMunicipalityReleaseForProfile(currentProfile, currentAuthEmail);
+  if (!releaseCheck.ok) {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    resetAppStateOnSignOut();
+    notice(releaseCheck.message, true);
+    return;
+  }
+
   try {
     const queries = [
       fetchRows("schools"),
@@ -1988,6 +2176,7 @@ $("school-form")?.addEventListener("submit", async e => {
     .join(" · ");
 
   const schoolPayload = {
+    ...(currentProfile?.municipality_id ? { municipality_id: currentProfile.municipality_id } : {}),
     school_code: generateFourDigitSchoolCode(),
     name: schoolName,
     manager_name: String(managerBlock.nome_gestor || "").trim() || null,
@@ -3027,7 +3216,8 @@ if (userForm) {
       email: payload.email?.trim().toLowerCase(),
       password: payload.password,
       role: payload.role,
-      school_id: payload.school_id || null
+      school_id: payload.school_id || null,
+      municipality_id: currentProfile?.municipality_id || null
     };
 
     try {
@@ -3403,3 +3593,4 @@ document.querySelectorAll('input[name="school_year"]').forEach(x => {
 if ($('input[name="census_year"]')) {
   $('input[name="census_year"]').value = new Date().getFullYear();
 }
+```[cite: 4]
