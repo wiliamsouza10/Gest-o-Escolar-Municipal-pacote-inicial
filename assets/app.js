@@ -11,7 +11,7 @@ const CREATE_USER_FUNCTION = "create-user";
 // E-mail(s) exclusivos do proprietário do sistema com acesso ao licenciamento de cidades.
 // Substitua pelo e-mail real do proprietário do programa.
 const OWNER_EMAILS = [
-  "proprietario@gestaoescolar.com.br"
+  "ws048400@gmail.com"
 ].map(e => e.trim().toLowerCase());
 
 const configured =
