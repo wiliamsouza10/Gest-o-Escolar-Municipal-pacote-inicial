@@ -1,4 +1,4 @@
-root {
+:root {
   --bg: #f3f6f4;
   --surface: #ffffff;
   --surface-alt: #f8fbf9;
@@ -40,6 +40,12 @@ body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.45;
+  overflow-x: hidden;
+}
+
+img,
+svg {
+  max-width: 100%;
 }
 
 .hidden {
@@ -101,6 +107,7 @@ body {
   flex-direction: column;
   justify-content: space-between;
   gap: 24px;
+  min-width: 0;
 }
 
 .login-hero-badge {
@@ -112,6 +119,7 @@ body {
 .login-system-meta {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .login-system-meta span {
@@ -137,6 +145,7 @@ body {
   flex-direction: column;
   justify-content: center;
   gap: 14px;
+  min-width: 0;
 }
 
 .login-card-header {
@@ -162,6 +171,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .login-card h1 {
@@ -194,6 +204,7 @@ body {
 .app {
   min-height: 100vh;
   display: flex;
+  width: 100%;
 }
 
 .sidebar {
@@ -212,6 +223,7 @@ body {
   align-items: center;
   gap: 10px;
   padding: 4px 6px;
+  min-width: 0;
 }
 
 .side-brand strong {
@@ -232,12 +244,18 @@ body {
   padding: 10px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.06);
+  min-width: 0;
+}
+
+.user-box > div {
+  min-width: 0;
 }
 
 .user-box strong {
   display: block;
   font-size: 0.88rem;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .user-box span {
@@ -245,6 +263,7 @@ body {
   font-size: 0.76rem;
   color: rgba(255, 255, 255, 0.72);
   margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 
 .avatar {
@@ -348,6 +367,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-width: 0;
 }
 
 /* --- AVISOS / MENSAGENS --- */
@@ -390,6 +410,11 @@ body {
   box-shadow: var(--shadow-md);
 }
 
+.welcome > div:first-child {
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
 .welcome h1 {
   margin: 4px 0 8px;
   font-size: 1.55rem;
@@ -408,6 +433,7 @@ body {
   flex-direction: column;
   gap: 8px;
   min-width: 230px;
+  max-width: 100%;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
@@ -452,6 +478,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .stat span,
@@ -483,6 +510,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 .panel-head {
@@ -508,6 +536,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
 }
 
 .panel-sub h4 {
@@ -531,6 +560,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
   transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
@@ -570,11 +600,13 @@ label {
   font-size: 0.86rem;
   font-weight: 600;
   color: var(--text);
+  min-width: 0;
 }
 
 input,
 select {
   width: 100%;
+  max-width: 100%;
   padding: 9px 11px;
   border: 1px solid #c7d2cb;
   border-radius: var(--radius-sm);
@@ -674,6 +706,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -681,13 +714,14 @@ button:disabled {
 }
 
 .attendance-row select {
-  max-width: 190px;
+  max-width: 210px;
 }
 
 /* --- TABELAS --- */
 .table-wrap {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -766,6 +800,12 @@ footer {
     font-size: 0.82rem;
   }
 
+  .inline-controls label,
+  .attendance-row select {
+    max-width: 100%;
+    flex: 1 1 180px;
+  }
+
   .page,
   .topbar,
   footer {
@@ -780,6 +820,11 @@ footer {
 }
 
 @media print {
+  body {
+    background: #ffffff;
+    overflow: visible;
+  }
+
   .sidebar,
   .topbar .inline-controls,
   .secure,
@@ -799,5 +844,10 @@ footer {
   .report,
   .table-wrap {
     box-shadow: none;
+    break-inside: avoid;
+  }
+
+  tr {
+    break-inside: avoid;
   }
 }
