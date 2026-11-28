@@ -314,6 +314,71 @@ svg {
   font-weight: 600;
 }
 
+/* --- MENU SUSPENSO LATERAL (OPÇÃO ALUNO) --- */
+.sidebar-dropdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-dropdown-toggle {
+  justify-content: space-between;
+}
+
+.sidebar-dropdown-toggle .nav-item-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-chevron {
+  font-size: 0.85rem;
+  transition: transform 0.18s ease;
+  opacity: 0.85;
+}
+
+.sidebar-dropdown.open .sidebar-chevron {
+  transform: rotate(180deg);
+}
+
+.sidebar-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-left: 12px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 2px solid var(--sidebar-active);
+}
+
+.sidebar-subitem {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 8px 10px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-subitem:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.sidebar-subitem.active {
+  background: var(--sidebar-active);
+  color: #ffffff;
+  font-weight: 600;
+}
+
 .logout {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -798,6 +863,22 @@ footer {
     width: auto;
     padding: 8px 10px;
     font-size: 0.82rem;
+  }
+
+  .sidebar-dropdown {
+    position: relative;
+  }
+
+  .sidebar-submenu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 220px;
+    margin-left: 0;
+    background: var(--sidebar-bg);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: var(--shadow-md);
+    z-index: 900;
   }
 
   .inline-controls label,
