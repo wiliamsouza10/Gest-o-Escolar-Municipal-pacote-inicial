@@ -57,6 +57,7 @@ let currentAuthEmail = "";
 let selectedSchoolId = "";
 let cachedSchools = [], cachedStudents = [], cachedClasses = [], cachedEnrollments = [], cachedProfiles = [], cachedLessons = [];
 let cachedCityLicenses = [];
+let cachedStudentTransfers = [];
 let attendanceRows = [];
 let activeLessonDetailSchoolId = null;
 let isSigningOut = false;
@@ -66,6 +67,14 @@ const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
 const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v2";
 const SCHOOL_DRAFT_CENSUS_KEY = "ge_rascunho_censo_escola_v1";
 const CITY_LICENSES_STORAGE_KEY = "ge_licencas_cidades_v1";
+const STUDENT_TRANSFERS_STORAGE_KEY = "ge_transferencias_alunos_v1";
+
+const STUDENT_MENU_PAGES = new Set([
+  "cadastro-aluno",
+  "gerenciar-aluno",
+  "transferencia-rede",
+  "transferencia-externa"
+]);
 
 function getTodayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -316,6 +325,7 @@ function hydrateUserScopedCache() {
   cachedMonitors = loadLocalJson(getScopedStorageKey(MONITORS_STORAGE_KEY), []);
   cachedCensus = loadLocalJson(getScopedStorageKey(CENSUS_STORAGE_KEY), []);
   cachedCityLicenses = loadLocalJson(CITY_LICENSES_STORAGE_KEY, []);
+  cachedStudentTransfers = loadLocalJson(getScopedStorageKey(STUDENT_TRANSFERS_STORAGE_KEY), []);
 }
 
 const $ = (id) => document.getElementById(id);
@@ -448,6 +458,10 @@ function hasBoundSchoolUnit() {
   return Boolean(currentProfile?.school_id);
 }
 
+function canManageStudentDropdown() {
+  return isSchoolUnitProfile();
+}
+
 function canAccessCensus() {
   return isSchoolUnitProfile() && hasBoundSchoolUnit();
 }
@@ -544,6 +558,16 @@ function updateRoleLabel() {
   }
 }
 
+function setSidebarStudentDropdownOpen(open) {
+  const wrapper = $("sidebar-aluno-dropdown");
+  const toggleBtn = $("sidebar-aluno-toggle");
+  const submenu = $("sidebar-aluno-submenu");
+  if (!wrapper || !toggleBtn || !submenu) return;
+  wrapper.classList.toggle("open", Boolean(open));
+  submenu.classList.toggle("hidden", !open);
+  toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
 function resetAppStateOnSignOut() {
   currentProfile = null;
   currentAuthEmail = "";
@@ -555,11 +579,14 @@ function resetAppStateOnSignOut() {
   cachedProfiles = [];
   cachedLessons = [];
   cachedCityLicenses = [];
+  cachedStudentTransfers = [];
   attendanceRows = [];
   activeLessonDetailSchoolId = null;
   activeCensusModuleKey = null;
   activeDraftSchoolModuleKey = null;
 
+  setSidebarStudentDropdownOpen(false);
+  $("edit-student-box")?.classList.add("hidden");
   $("school-census-module-editor")?.classList.add("hidden");
   $("census-module-editor")?.classList.add("hidden");
   $("sec-lessons-school-detail")?.classList.add("hidden");
@@ -645,6 +672,8 @@ function showApp(profile, user) {
     el.classList.toggle("hidden", !roles.includes(currentProfile.role));
   });
 
+  setSidebarStudentDropdownOpen(false);
+
   if (!isSecretaria() && !isProprietario() && !profile.school_id) {
     notice("Seu perfil ainda não possui uma escola vinculada na tabela de perfis. Solicite à Secretaria de Educação o vínculo da unidade.", true);
   }
@@ -667,6 +696,11 @@ function go(page) {
     page = "inicio";
   }
 
+  if (STUDENT_MENU_PAGES.has(page) && !canManageStudentDropdown()) {
+    notice("As opções do menu Aluno estão disponíveis apenas para Gestor escolar e Secretário escolar.", true);
+    page = isSecretaria() ? "alunos" : "inicio";
+  }
+
   if ((page === "matriculas" || page === "turmas") && !canManageClassesAndEnrollments()) {
     notice("Matrículas e Turmas estão disponíveis apenas para Gestor escolar e Secretário escolar vinculados a uma unidade escolar.", true);
     page = "inicio";
@@ -684,12 +718,29 @@ function go(page) {
 
   document.querySelectorAll(".page").forEach(p => p.classList.add("hidden"));
   $("page-" + page)?.classList.remove("hidden");
-  document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.page === page));
+
+  document.querySelectorAll(".nav-item[data-page]").forEach(n => {
+    n.classList.toggle("active", n.dataset.page === page);
+  });
+
+  const isStudentSubPage = STUDENT_MENU_PAGES.has(page);
+  $("sidebar-aluno-toggle")?.classList.toggle("active", isStudentSubPage);
+  if (isStudentSubPage) {
+    setSidebarStudentDropdownOpen(true);
+  }
+  document.querySelectorAll(".sidebar-subitem[data-page]").forEach(sub => {
+    sub.classList.toggle("active", sub.dataset.page === page);
+  });
+
   $("page-title").textContent = ({
     inicio: "Painel inicial",
     cidades: "Licenciamento de Cidades",
     escolas: "Unidades escolares",
     alunos: "Cadastro de alunos",
+    "cadastro-aluno": "Aluno · Cadastro de Aluno",
+    "gerenciar-aluno": "Aluno · Gerenciar Aluno",
+    "transferencia-rede": "Aluno · Transferência na Rede",
+    "transferencia-externa": "Aluno · Transferência Externa",
     matriculas: "Matrículas",
     turmas: "Turmas",
     diario: "Diário de classe",
@@ -701,6 +752,17 @@ function go(page) {
 
   if (page === "cidades" && isProprietario()) {
     loadCityLicenses();
+  }
+  if (page === "gerenciar-aluno" && canManageStudentDropdown()) {
+    renderManageStudents();
+  }
+  if (page === "transferencia-rede" && canManageStudentDropdown()) {
+    fillTransferSelects();
+    renderStudentTransfers();
+  }
+  if (page === "transferencia-externa" && canManageStudentDropdown()) {
+    fillTransferSelects();
+    renderStudentTransfers();
   }
   if (page === "diario" && canAccessDiary()) loadLessons();
   if (page === "usuarios") loadProfiles();
@@ -720,7 +782,23 @@ function go(page) {
   }
 }
 
-document.querySelectorAll(".nav-item").forEach(b => b.addEventListener("click", () => go(b.dataset.page)));
+document.querySelectorAll(".nav-item[data-page]").forEach(b => {
+  b.addEventListener("click", () => go(b.dataset.page));
+});
+
+$("sidebar-aluno-toggle")?.addEventListener("click", e => {
+  e.stopPropagation();
+  if (!canManageStudentDropdown()) return;
+  const isOpen = $("sidebar-aluno-dropdown")?.classList.contains("open");
+  setSidebarStudentDropdownOpen(!isOpen);
+});
+
+document.querySelectorAll(".sidebar-subitem[data-page]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    go(btn.dataset.page);
+  });
+});
+
 document.querySelectorAll("[data-goto]").forEach(b => b.addEventListener("click", () => go(b.dataset.goto)));
 
 async function requireConfig() {
@@ -1851,6 +1929,11 @@ function applySchoolScope() {
   renderReportSection();
   renderSchools(scopedSchools);
   renderStudents(scopedStudents);
+  if (canManageStudentDropdown()) {
+    renderManageStudents(scopedStudents);
+    fillTransferSelects(scopedStudents);
+    renderStudentTransfers();
+  }
   if (canManageClassesAndEnrollments()) {
     renderClasses(scopedClasses);
     renderEnrollments(scopedEnrollments);
@@ -2380,6 +2463,22 @@ $("schools-body")?.addEventListener("click", async e => {
   if (school) setActiveSchool(school, false);
 });
 
+// --- ALUNOS: LISTAGEM, GERENCIAMENTO E TRANSFERÊNCIAS ---
+function getStudentStatusLabel(student) {
+  if (!student.school_id) {
+    return "Transferido (Externo)";
+  }
+  const hasActiveEnrollment = cachedEnrollments.some(
+    en => en.student_id === student.id && en.status === "ativa"
+  );
+  if (hasActiveEnrollment) return "Enturmado (Ativo)";
+  const hasTransferred = cachedEnrollments.some(
+    en => en.student_id === student.id && en.status === "transferida"
+  );
+  if (hasTransferred) return "Transferido / Aguardando enturmação";
+  return "Cadastrado (Sem turma)";
+}
+
 function renderStudents(rows = getScopedStudents()) {
   if (!$("students-body")) return;
   $("students-body").innerHTML = rows.map(s =>
@@ -2394,6 +2493,318 @@ function renderStudents(rows = getScopedStudents()) {
     </tr>`
   ).join("") || '<tr><td colspan="7">Nenhum aluno cadastrado.</td></tr>';
 }
+
+function renderManageStudents(baseRows = getScopedStudents()) {
+  if (!$("manage-students-body")) return;
+  const query = String($("manage-student-search")?.value || "").trim().toLowerCase();
+  const queryDigits = normalizeCpf(query);
+
+  const filtered = query
+    ? baseRows.filter(s =>
+        String(s.full_name || "").toLowerCase().includes(query) ||
+        String(s.guardian_name || "").toLowerCase().includes(query) ||
+        (queryDigits && normalizeCpf(s.cpf).includes(queryDigits))
+      )
+    : baseRows;
+
+  $("manage-students-body").innerHTML = filtered.map(s =>
+    `<tr>
+      <td><strong>${escapeHtml(s.full_name)}</strong></td>
+      <td>${escapeHtml(formatCpf(s.cpf))}</td>
+      <td>${escapeHtml(s.birth_date || "—")}</td>
+      <td>${isPcdStudent(s) ? "Sim" : "Não"}</td>
+      <td>${escapeHtml(s.guardian_name || "—")}</td>
+      <td>${escapeHtml(getStudentStatusLabel(s))}</td>
+      <td>
+        <button type="button" class="secondary small" data-edit-student="${escapeHtml(s.id)}">Editar</button>
+      </td>
+    </tr>`
+  ).join("") || '<tr><td colspan="7">Nenhum aluno encontrado na unidade escolar.</td></tr>';
+}
+
+$("manage-student-search")?.addEventListener("input", () => {
+  renderManageStudents();
+});
+
+$("manage-students-body")?.addEventListener("click", e => {
+  const btn = e.target.closest("[data-edit-student]");
+  if (!btn || !canManageStudentDropdown()) return;
+  const student = getScopedStudents().find(s => s.id === btn.dataset.editStudent);
+  if (!student) return;
+
+  $("edit-student-box")?.classList.remove("hidden");
+  if ($("edit-student-id")) $("edit-student-id").value = student.id;
+  if ($("edit-student-name")) $("edit-student-name").value = student.full_name || "";
+  if ($("edit-student-cpf")) $("edit-student-cpf").value = formatCpf(student.cpf) !== "—" ? formatCpf(student.cpf) : "";
+  if ($("edit-student-birth")) $("edit-student-birth").value = student.birth_date || "";
+  if ($("edit-student-race")) $("edit-student-race").value = student.race_color || "Não declarada";
+  if ($("edit-student-pcd")) $("edit-student-pcd").value = isPcdStudent(student) ? "true" : "false";
+  if ($("edit-student-guardian")) $("edit-student-guardian").value = student.guardian_name || "";
+  if ($("edit-student-phone")) $("edit-student-phone").value = student.guardian_phone || "";
+  if ($("edit-student-notes")) $("edit-student-notes").value = student.notes || "";
+  $("edit-student-box")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+
+$("cancel-edit-student")?.addEventListener("click", () => {
+  $("edit-student-box")?.classList.add("hidden");
+  $("edit-student-form")?.reset();
+});
+
+$("edit-student-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!supabase || !canManageStudentDropdown()) return;
+
+  const raw = formObject(e.target);
+  const studentId = raw.id;
+  const targetStudent = getScopedStudents().find(s => s.id === studentId);
+  if (!targetStudent) {
+    notice("Aluno não encontrado na unidade vinculada.", true);
+    return;
+  }
+
+  const cpfCheck = validateAndNormalizeCpf(raw.cpf, "CPF do aluno");
+  if (!cpfCheck.valid) {
+    notice(cpfCheck.error, true);
+    return;
+  }
+
+  if (cpfCheck.cpf && cachedStudents.some(s => s.id !== studentId && normalizeCpf(s.cpf) === cpfCheck.cpf)) {
+    notice("Já existe outro aluno cadastrado com este CPF.", true);
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from("students")
+      .update({
+        full_name: String(raw.full_name || "").trim(),
+        cpf: cpfCheck.cpf,
+        birth_date: raw.birth_date || null,
+        race_color: String(raw.race_color || "Não declarada").trim() || "Não declarada",
+        is_pcd: raw.is_pcd === "true" || raw.is_pcd === true,
+        guardian_name: String(raw.guardian_name || "").trim() || null,
+        guardian_phone: String(raw.guardian_phone || "").trim() || null,
+        notes: String(raw.notes || "").trim() || null
+      })
+      .eq("id", studentId);
+    if (error) throw error;
+
+    $("edit-student-box")?.classList.add("hidden");
+    notice("Dados do aluno atualizados com sucesso.");
+    await loadAll();
+  } catch (err) {
+    console.error("Erro ao atualizar aluno:", formatSupabaseError(err), err);
+    notice(`Não foi possível atualizar os dados do aluno (${formatSupabaseError(err)}).`, true);
+  }
+});
+
+function fillTransferSelects(scopedStudents = getScopedStudents()) {
+  const currentSchoolId = getEffectiveSchoolId();
+  const otherNetworkSchools = cachedSchools.filter(s => s.id !== currentSchoolId);
+
+  fillSelect(
+    "internal-transfer-student",
+    scopedStudents,
+    s => `${s.full_name}${s.cpf ? ` · CPF ${formatCpf(s.cpf)}` : ""}`,
+    "Selecione o aluno"
+  );
+  fillSelect(
+    "internal-transfer-school",
+    otherNetworkSchools,
+    s => formatSchoolOption(s),
+    "Selecione a escola de destino"
+  );
+  fillSelect(
+    "external-transfer-student",
+    scopedStudents,
+    s => `${s.full_name}${s.cpf ? ` · CPF ${formatCpf(s.cpf)}` : ""}`,
+    "Selecione o aluno"
+  );
+
+  if ($("internal-transfer-date") && !$("internal-transfer-date").value) {
+    $("internal-transfer-date").value = getTodayIso();
+  }
+  if ($("external-transfer-date") && !$("external-transfer-date").value) {
+    $("external-transfer-date").value = getTodayIso();
+  }
+}
+
+function renderStudentTransfers() {
+  const currentSchoolId = getEffectiveSchoolId();
+  const internalRows = cachedStudentTransfers.filter(
+    t => t.type === "rede" && (!currentSchoolId || t.origin_school_id === currentSchoolId || t.target_school_id === currentSchoolId)
+  );
+  const externalRows = cachedStudentTransfers.filter(
+    t => t.type === "externa" && (!currentSchoolId || t.origin_school_id === currentSchoolId)
+  );
+
+  if ($("internal-transfers-body")) {
+    $("internal-transfers-body").innerHTML = internalRows.map(t =>
+      `<tr>
+        <td>${escapeHtml(formatBrDate(t.transfer_date))}</td>
+        <td><strong>${escapeHtml(t.student_name)}</strong></td>
+        <td>${escapeHtml(t.origin_school_name || "—")}</td>
+        <td>${escapeHtml(t.target_school_name || "—")}</td>
+        <td>${escapeHtml(t.reason || "—")}</td>
+      </tr>`
+    ).join("") || '<tr><td colspan="5">Nenhuma transferência na rede registrada.</td></tr>';
+  }
+
+  if ($("external-transfers-body")) {
+    $("external-transfers-body").innerHTML = externalRows.map(t =>
+      `<tr>
+        <td>${escapeHtml(formatBrDate(t.transfer_date))}</td>
+        <td><strong>${escapeHtml(t.student_name)}</strong></td>
+        <td>${escapeHtml(t.origin_school_name || "—")}</td>
+        <td>${escapeHtml(t.destination_school || "—")}</td>
+        <td>${escapeHtml(t.reason || "—")}</td>
+      </tr>`
+    ).join("") || '<tr><td colspan="5">Nenhuma transferência externa registrada.</td></tr>';
+  }
+}
+
+async function closeActiveEnrollmentsForStudent(studentId) {
+  if (!supabase || !studentId) return;
+  const activeIds = cachedEnrollments
+    .filter(en => en.student_id === studentId && en.status === "ativa")
+    .map(en => en.id);
+  if (!activeIds.length) return;
+
+  const { error } = await supabase
+    .from("enrollments")
+    .update({ status: "transferida" })
+    .in("id", activeIds);
+  if (error) throw error;
+}
+
+$("internal-transfer-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!supabase || !canManageStudentDropdown()) return;
+
+  const raw = formObject(e.target);
+  const studentId = raw.student_id;
+  const targetSchoolId = raw.target_school_id;
+  const transferDate = raw.transfer_date || getTodayIso();
+  const reason = String(raw.reason || "").trim();
+
+  const student = getScopedStudents().find(s => s.id === studentId);
+  const originSchool = getActiveSchool();
+  const targetSchool = cachedSchools.find(s => s.id === targetSchoolId);
+
+  if (!student || !targetSchool) {
+    notice("Selecione um aluno válido e uma escola de destino da rede.", true);
+    return;
+  }
+
+  if (targetSchool.id === originSchool?.id) {
+    notice("A escola de destino deve ser diferente da unidade atual.", true);
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Confirmar transferência na rede do(a) estudante "${student.full_name}" para "${targetSchool.name}"? As matrículas ativas na escola atual serão encerradas como transferidas.`
+  );
+  if (!confirmed) return;
+
+  try {
+    await closeActiveEnrollmentsForStudent(student.id);
+
+    const { error } = await supabase
+      .from("students")
+      .update({ school_id: targetSchool.id })
+      .eq("id", student.id);
+    if (error) throw error;
+
+    const transferRecord = {
+      id: `tr-rede-${Date.now()}`,
+      type: "rede",
+      student_id: student.id,
+      student_name: student.full_name,
+      origin_school_id: originSchool?.id || "",
+      origin_school_name: originSchool?.name || "—",
+      target_school_id: targetSchool.id,
+      target_school_name: targetSchool.name,
+      transfer_date: transferDate,
+      reason: reason || "Transferência entre unidades da rede municipal",
+      created_at: new Date().toISOString()
+    };
+
+    cachedStudentTransfers = [transferRecord, ...cachedStudentTransfers];
+    saveLocalJson(getScopedStorageKey(STUDENT_TRANSFERS_STORAGE_KEY), cachedStudentTransfers);
+
+    e.target.reset();
+    if ($("internal-transfer-date")) $("internal-transfer-date").value = getTodayIso();
+    notice(`Transferência na rede concluída: "${student.full_name}" foi transferido(a) para "${targetSchool.name}".`);
+    await loadAll();
+  } catch (err) {
+    console.error("Erro na transferência na rede:", formatSupabaseError(err), err);
+    notice(`Não foi possível concluir a transferência na rede (${formatSupabaseError(err)}).`, true);
+  }
+});
+
+$("external-transfer-form")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!supabase || !canManageStudentDropdown()) return;
+
+  const raw = formObject(e.target);
+  const studentId = raw.student_id;
+  const destinationSchool = String(raw.destination_school || "").trim();
+  const transferDate = raw.transfer_date || getTodayIso();
+  const reason = String(raw.reason || "").trim();
+
+  const student = getScopedStudents().find(s => s.id === studentId);
+  const originSchool = getActiveSchool();
+
+  if (!student || !destinationSchool) {
+    notice("Selecione o aluno e informe a instituição/município de destino.", true);
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Confirmar transferência externa do(a) estudante "${student.full_name}" para "${destinationSchool}"? O vínculo ativo com esta escola será encerrado.`
+  );
+  if (!confirmed) return;
+
+  try {
+    await closeActiveEnrollmentsForStudent(student.id);
+
+    const transferNote = `[Transferência Externa em ${formatBrDate(transferDate)} para ${destinationSchool}${reason ? ` - ${reason}` : ""}]`;
+    const mergedNotes = [student.notes, transferNote].filter(Boolean).join(" ");
+
+    const { error } = await supabase
+      .from("students")
+      .update({
+        school_id: null,
+        notes: mergedNotes
+      })
+      .eq("id", student.id);
+    if (error) throw error;
+
+    const transferRecord = {
+      id: `tr-ext-${Date.now()}`,
+      type: "externa",
+      student_id: student.id,
+      student_name: student.full_name,
+      origin_school_id: originSchool?.id || "",
+      origin_school_name: originSchool?.name || "—",
+      destination_school: destinationSchool,
+      transfer_date: transferDate,
+      reason: reason || "Transferência para fora da rede municipal",
+      created_at: new Date().toISOString()
+    };
+
+    cachedStudentTransfers = [transferRecord, ...cachedStudentTransfers];
+    saveLocalJson(getScopedStorageKey(STUDENT_TRANSFERS_STORAGE_KEY), cachedStudentTransfers);
+
+    e.target.reset();
+    if ($("external-transfer-date")) $("external-transfer-date").value = getTodayIso();
+    notice(`Transferência externa de "${student.full_name}" registrada com sucesso.`);
+    await loadAll();
+  } catch (err) {
+    console.error("Erro na transferência externa:", formatSupabaseError(err), err);
+    notice(`Não foi possível registrar a transferência externa (${formatSupabaseError(err)}).`, true);
+  }
+});
 
 function formatSchedule(startTime, endTime) {
   if (startTime && endTime) return `${startTime.slice(0, 5)} - ${endTime.slice(0, 5)}`;
@@ -3607,58 +4018,57 @@ $("load-attendance")?.addEventListener("click", async () => {
       .from("enrollments")
       .select("student_id,students(id,full_name)")
       .eq("class_id", classId)
-      .eq("school_year", Number(date.slice(0, 4)))
       .eq("status", "ativa");
     if (error) throw error;
-    attendanceRows = (data || []).map(x => ({
-      student_id: x.student_id,
-      name: x.students?.full_name || "Aluno",
-      status: "presente"
-    }));
-    $("attendance-list").innerHTML = attendanceRows.map((x, i) =>
-      `<div class="attendance-row"><strong>${escapeHtml(x.name)}</strong><select data-attendance="${i}"><option value="presente">Presente</option><option value="falta">Falta</option><option value="justificada">Falta justificada</option></select></div>`
-    ).join("") || "<p class='muted'>Não há alunos ativos nesta turma/ano.</p>";
-    $("attendance-list").querySelectorAll("select").forEach(s =>
-      s.addEventListener("change", () => {
-        attendanceRows[Number(s.dataset.attendance)].status = s.value;
-      })
-    );
-    $("save-attendance")?.classList.toggle("hidden", attendanceRows.length === 0);
-  } catch (e) {
-    console.error("Erro ao carregar frequência:", formatSupabaseError(e), e);
-    notice("Não foi possível carregar a lista de alunos.", true);
+    attendanceRows = (data || []).map(x => x.students).filter(Boolean);
+    $("attendance-list").innerHTML = attendanceRows.map(s =>
+      `<div class="attendance-row">
+        <span>${escapeHtml(s.full_name)}</span>
+        <select data-student="${escapeHtml(s.id)}">
+          <option value="presente">Presente</option>
+          <option value="falta">Falta</option>
+          <option value="justificada">Falta justificada</option>
+        </select>
+      </div>`
+    ).join("") || '<p class="muted">Nenhum aluno matriculado nesta turma.</p>';
+    $("save-attendance")?.classList.toggle("hidden", !attendanceRows.length);
+  } catch (err) {
+    console.error("Erro ao carregar alunos:", formatSupabaseError(err), err);
+    notice("Erro ao carregar alunos da turma.", true);
   }
 });
 
 $("save-attendance")?.addEventListener("click", async () => {
-  if (!supabase || !canAccessDiary()) return;
+  if (!supabase) return;
+  if (!canAccessDiary()) {
+    notice("Apenas perfis vinculados à unidade escolar podem salvar frequência.", true);
+    return;
+  }
   const classId = $("attendance-class")?.value;
-  const date = $("attendance-date")?.value;
-  if (!classId || !date || !attendanceRows.length) return;
-
+  const attendanceDate = $("attendance-date")?.value;
+  const rows = [...document.querySelectorAll("#attendance-list select")].map(s => ({
+    class_id: classId,
+    student_id: s.dataset.student,
+    attendance_date: attendanceDate,
+    status: s.value,
+    recorded_by: currentProfile?.id
+  }));
+  if (!rows.length) return;
   try {
-    const payload = attendanceRows.map(x => ({
-      class_id: classId,
-      student_id: x.student_id,
-      attendance_date: date,
-      status: x.status,
-      recorded_by: currentProfile?.id || null
-    }));
     const { error } = await supabase
       .from("attendance")
-      .upsert(payload, { onConflict: "class_id,student_id,attendance_date" });
+      .upsert(rows, { onConflict: "class_id,student_id,attendance_date" });
     if (error) throw error;
-    notice("Frequência salva com sucesso.");
-  } catch (e) {
-    console.error("Erro ao salvar frequência:", formatSupabaseError(e), e);
-    notice("Não foi possível salvar a frequência. Verifique as permissões.", true);
+    notice("Frequência salva.");
+  } catch (err) {
+    console.error("Erro ao salvar frequência:", formatSupabaseError(err), err);
+    notice("Não foi possível salvar a frequência.", true);
   }
 });
 
-if ($("attendance-date")) $("attendance-date").value = getTodayIso();
-document.querySelectorAll('input[name="school_year"]').forEach(x => {
-  x.value = new Date().getFullYear();
+const today = getTodayIso();
+document.querySelectorAll('input[type="date"]').forEach(d => {
+  if (d.name !== "birth_date" && d.name !== "expires_at") d.value = today;
 });
-if ($('input[name="census_year"]')) {
-  $('input[name="census_year"]').value = new Date().getFullYear();
-}
+document.querySelectorAll('input[name="school_year"]').forEach(y => y.value = new Date().getFullYear());
+if ($("census-year-input")) $("census-year-input").value = new Date().getFullYear();
