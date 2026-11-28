@@ -762,6 +762,7 @@ $("login-form")?.addEventListener("submit", async e => {
 });
 
 async function loadProfile(user) {
+  if (!supabase || !user) return;
   try {
     const emailLower = String(user?.email || "").trim().toLowerCase();
     const { data, error } = await supabase
@@ -1862,6 +1863,7 @@ function applySchoolScope() {
 }
 
 async function fetchRows(table, select = "*") {
+  if (!supabase) throw new Error("Cliente Supabase não inicializado.");
   const orderCol = table === "schools" ? "name" : "created_at";
   const ascending = table === "schools";
   const { data, error } = await supabase
@@ -1874,7 +1876,7 @@ async function fetchRows(table, select = "*") {
 }
 
 async function loadProfiles() {
-  if (!$("users-body") && !isSecretaria()) return;
+  if (!supabase || (!$("users-body") && !isSecretaria())) return;
   try {
     const { data, error } = await supabase
       .from("profiles")
@@ -1911,7 +1913,7 @@ $("class-school")?.addEventListener("change", () => {
 });
 
 async function loadAll() {
-  if (!currentProfile) return;
+  if (!currentProfile || !supabase) return;
 
   if (isProprietario()) {
     await loadCityLicenses();
@@ -1956,7 +1958,7 @@ async function loadAll() {
       cachedLessons = secretariaLessons;
     }
 
-    if (supabase && canAccessCensus()) {
+    if (canAccessCensus()) {
       try {
         const remoteCensus = await fetchRows("school_census_mappings");
         if (Array.isArray(remoteCensus) && remoteCensus.length) {
@@ -2186,6 +2188,10 @@ $("school-census-cancel-module")?.addEventListener("click", () => {
 
 $("school-form")?.addEventListener("submit", async e => {
   e.preventDefault();
+  if (!supabase) {
+    notice("Supabase não configurado.", true);
+    return;
+  }
   if (!isSecretaria()) {
     notice("Apenas o perfil Secretaria de Educação pode cadastrar escolas.", true);
     return;
@@ -2301,6 +2307,7 @@ function renderSchools(visibleSchools = getScopedSchools()) {
 }
 
 async function unlinkProfilesFromSchool(schoolId) {
+  if (!supabase) return;
   const { error } = await supabase
     .from("profiles")
     .update({ school_id: null })
@@ -2312,6 +2319,7 @@ $("schools-body")?.addEventListener("click", async e => {
   const delBtn = e.target.closest("[data-delete-school]");
   if (delBtn) {
     e.stopPropagation();
+    if (!supabase) return;
     if (!isSecretaria()) {
       notice("Apenas o perfil Secretaria de Educação pode excluir escolas.", true);
       return;
@@ -2418,7 +2426,7 @@ function renderClasses(rows = getScopedClasses()) {
       <td>${isAee ? "Sim (AEE)" : "Não"}</td>
       <td><strong>${activeCount}</strong></td>
       <td>${escapeHtml(formatSchedule(c.start_time, c.end_time))}</td>
-      <td>${c.school_year}</td>
+      <td>${escapeHtml(String(c.school_year || "—"))}</td>
       <td>${escapeHtml(c.schools?.name || "—")}</td>
       <td>${teacherCell}</td>
     </tr>`;
@@ -2427,7 +2435,7 @@ function renderClasses(rows = getScopedClasses()) {
 
 $("classes-body")?.addEventListener("change", async e => {
   const select = e.target.closest("[data-assign-teacher]");
-  if (!select) return;
+  if (!select || !supabase) return;
   if (!canManageClassesAndEnrollments()) {
     notice("Seu perfil não tem permissão para vincular professores às turmas.", true);
     return;
@@ -2483,7 +2491,7 @@ function renderEnrollments(rows = getScopedEnrollments()) {
       <td>${escapeHtml(cls?.name || "—")}</td>
       <td>${classType}</td>
       <td>${transportLabel}</td>
-      <td>${e.school_year}</td>
+      <td>${escapeHtml(String(e.school_year || "—"))}</td>
       <td>${escapeHtml(e.status)}</td>
     </tr>`;
   }).join("") || '<tr><td colspan="7">Nenhuma matrícula cadastrada.</td></tr>';
@@ -2689,7 +2697,7 @@ function getSelectedCensusSchoolId() {
 
 function getSelectedCensusYear() {
   const y = Number($("census-year-input")?.value);
-  return y || new Date().getFullYear();
+  return Number.isFinite(y) && y >= 2020 ? y : new Date().getFullYear();
 }
 
 function getCurrentCensusEntry(schoolId = getSelectedCensusSchoolId(), year = getSelectedCensusYear()) {
@@ -3111,15 +3119,20 @@ $("census-save-module")?.addEventListener("click", async () => {
   const baseModules = buildMigratedModulesFromSchool(school, existing?.modules || {});
   const currentModules = { ...baseModules, [activeCensusModuleKey]: modValues };
 
+  const formOperating = $("census-operating-status")?.value;
+  const formStages = $("census-offered-stages")?.value;
+  const formInfra = $("census-infrastructure-notes")?.value;
+  const formValidation = $("census-validation-status")?.value;
+
   const entry = {
     id: `censo-${school.id}-${year}`,
     school_id: school.id,
     school_name: currentModules.identificacao_escola?.nome_escola || school.name,
     census_year: year,
-    operating_status: currentModules.identificacao_escola?.situacao_funcionamento || existing?.operating_status || $("census-operating-status")?.value || "Em atividade",
-    offered_stages: existing?.offered_stages || currentModules.organizacao_ensino?.etapas_ofertadas || $("census-offered-stages")?.value || school.curriculum_offer || "Comum",
-    infrastructure_notes: existing?.infrastructure_notes || currentModules.computadores_internet?.acesso_internet || $("census-infrastructure-notes")?.value || "",
-    validation_status: existing?.validation_status || $("census-validation-status")?.value || "Em conferência",
+    operating_status: currentModules.identificacao_escola?.situacao_funcionamento || formOperating || existing?.operating_status || "Em atividade",
+    offered_stages: (formStages && formStages.trim()) || currentModules.organizacao_ensino?.etapas_ofertadas || existing?.offered_stages || school.curriculum_offer || "Comum",
+    infrastructure_notes: (formInfra !== undefined ? formInfra.trim() : "") || currentModules.computadores_internet?.acesso_internet || existing?.infrastructure_notes || "",
+    validation_status: formValidation || existing?.validation_status || "Em conferência",
     modules: currentModules
   };
 
@@ -3174,6 +3187,10 @@ $("census-form")?.addEventListener("submit", async e => {
 });
 
 async function callUserFunction(payload) {
+  if (!supabase) {
+    throw new Error("Supabase não configurado.");
+  }
+
   let { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   let token = sessionData?.session?.access_token;
 
@@ -3307,6 +3324,10 @@ async function insertForm(formId, table, transform = (x) => x, onSuccess = null,
   if (!form) return;
   form.addEventListener("submit", async e => {
     e.preventDefault();
+    if (!supabase) {
+      notice("Supabase não configurado.", true);
+      return;
+    }
     const raw = formObject(form);
     if (beforeInsert) {
       const check = beforeInsert(raw);
@@ -3382,6 +3403,10 @@ insertForm(
 
 $("class-form")?.addEventListener("submit", async e => {
   e.preventDefault();
+  if (!supabase) {
+    notice("Supabase não configurado.", true);
+    return;
+  }
   if (!canManageClassesAndEnrollments()) {
     notice("Apenas Gestor escolar e Secretário escolar vinculados a uma unidade podem criar turmas.", true);
     return;
@@ -3409,6 +3434,7 @@ $("class-form")?.addEventListener("submit", async e => {
   }
 
   const classCode = generateFourDigitClassCode();
+  const yearVal = Number(raw.school_year) || new Date().getFullYear();
 
   try {
     const { error } = await supabase.from("classes").insert({
@@ -3432,7 +3458,7 @@ $("class-form")?.addEventListener("submit", async e => {
       supervised_internship: raw.supervised_internship || "Não oferece disciplina",
       bilingual_deaf_class: raw.bilingual_deaf_class || "Não",
       shift: raw.shift || "Matutino",
-      school_year: Number(raw.school_year),
+      school_year: yearVal,
       school_id: targetSchoolId,
       teacher_id: teacherId
     });
@@ -3450,6 +3476,10 @@ $("class-form")?.addEventListener("submit", async e => {
 
 $("enrollment-form")?.addEventListener("submit", async e => {
   e.preventDefault();
+  if (!supabase) {
+    notice("Supabase não configurado.", true);
+    return;
+  }
   if (!canManageClassesAndEnrollments()) {
     notice("Apenas Gestor escolar e Secretário escolar vinculados a uma unidade podem enturmar alunos.", true);
     return;
@@ -3458,7 +3488,7 @@ $("enrollment-form")?.addEventListener("submit", async e => {
   const raw = formObject(e.target);
   const studentId = raw.student_id;
   const classId = raw.class_id;
-  const schoolYear = Number(raw.school_year);
+  const schoolYear = Number(raw.school_year) || new Date().getFullYear();
   const usesSchoolTransport = raw.uses_school_transport === "true" || raw.uses_school_transport === true;
   const status = raw.status || "ativa";
 
@@ -3542,7 +3572,7 @@ insertForm(
 );
 
 async function loadLessons() {
-  if (!$("lessons-body") || !canAccessDiary()) return;
+  if (!supabase || !$("lessons-body") || !canAccessDiary()) return;
   try {
     const { data, error } = await supabase
       .from("lessons")
@@ -3561,6 +3591,7 @@ async function loadLessons() {
 }
 
 $("load-attendance")?.addEventListener("click", async () => {
+  if (!supabase) return;
   if (!canAccessDiary()) {
     notice("Apenas perfis vinculados à unidade escolar podem acessar o diário.", true);
     return;
@@ -3600,7 +3631,7 @@ $("load-attendance")?.addEventListener("click", async () => {
 });
 
 $("save-attendance")?.addEventListener("click", async () => {
-  if (!canAccessDiary()) return;
+  if (!supabase || !canAccessDiary()) return;
   const classId = $("attendance-class")?.value;
   const date = $("attendance-date")?.value;
   if (!classId || !date || !attendanceRows.length) return;
