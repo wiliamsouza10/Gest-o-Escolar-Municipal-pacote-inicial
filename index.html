@@ -1,64 +1,62 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Sistema Municipal de Gestão Escolar">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestão Escolar Municipal</title>
   <link rel="stylesheet" href="assets/styles.css">
-  <style>
-    /* Garante prioridade de ocultação mesmo quando há componentes flex/grid */
-    .hidden {
-      display: none !important;
-    }
-  </style>
 </head>
 <body>
-  <div id="login-view" class="login-wrap">
+  <!-- TELA DE LOGIN -->
+  <section id="login-view" class="login-wrap">
     <div class="login-stage">
-      <aside class="login-visual" aria-label="Apresentação do sistema">
+      <div class="login-visual">
         <div class="login-hero-badge">
           <div class="brand-mark">GE</div>
           <div class="login-system-meta">
-            <strong>Gestão Escolar</strong>
-            <span>Rede Municipal de Ensino</span>
+            <strong>Gestão Escolar Municipal</strong>
+            <span>Plataforma integrada da rede de ensino</span>
           </div>
         </div>
-        <div class="login-illustration-slot" id="login-hero-media">
-          <p class="eyebrow light">REDE MUNICIPAL DE ENSINO</p>
-          <h2 class="login-hero-title">Gestão Escolar Integrada</h2>
-          <p class="login-hero-copy">Acompanhe escolas, matrículas, turmas, diário de classe e indicadores educacionais em um só ambiente.</p>
+        <div>
+          <p class="eyebrow light">Secretaria &amp; Unidades Escolares</p>
+          <h2 class="login-hero-title">Organização pedagógica, matrículas e Censo Escolar em um só lugar.</h2>
+          <p class="login-hero-copy">
+            Acesso controlado por perfil institucional e município licenciado.
+          </p>
         </div>
-      </aside>
+        <p class="tiny" style="color: rgba(255,255,255,0.75); margin: 0;">
+          Ambiente protegido · Autenticação institucional
+        </p>
+      </div>
 
-      <section class="login-card" aria-labelledby="login-heading">
+      <div class="login-card">
         <div class="login-card-header">
-          <div class="login-card-brand">
-            <span class="eyebrow">SECRETARIA DE EDUCAÇÃO</span>
-            <p class="login-card-subbrand">Plataforma Municipal</p>
+          <div>
+            <p class="eyebrow">Acesso ao Sistema</p>
+            <h1>Entrar</h1>
+            <p class="login-card-subbrand">Informe suas credenciais institucionais</p>
           </div>
-          <div class="login-card-emblem" aria-hidden="true">GE</div>
+          <div class="login-card-emblem">GE</div>
         </div>
 
-        <h1 id="login-heading">Gestão Escolar</h1>
-        <p class="muted">Acesso da Secretaria, unidades escolares e professores.</p>
-
-        <form id="login-form">
-          <label>E-mail institucional
-            <input id="email" type="email" autocomplete="username" required placeholder="seu.email@escola.gov.br">
+        <form id="login-form" class="form-grid" style="grid-template-columns: 1fr;">
+          <label>
+            E-mail institucional
+            <input type="email" id="email" required placeholder="seu.email@educacao.gov.br" autocomplete="username">
           </label>
-          <label>Senha
-            <input id="password" type="password" autocomplete="current-password" required placeholder="Sua senha">
+          <label>
+            Senha
+            <input type="password" id="password" required placeholder="••••••••" autocomplete="current-password">
           </label>
-          <button class="primary full" type="submit">Entrar no sistema</button>
-          <p id="login-error" class="error" role="alert"></p>
+          <button type="submit" class="primary full">Entrar no sistema</button>
         </form>
-
-        <p class="tiny">Acesso restrito a usuários autorizados.</p>
-      </section>
+        <p id="login-error" class="error"></p>
+      </div>
     </div>
-  </div>
+  </section>
 
+  <!-- APLICAÇÃO PRINCIPAL -->
   <div id="app-view" class="app hidden">
     <aside class="sidebar">
       <div class="side-brand">
@@ -68,248 +66,390 @@
           <span>Rede Municipal</span>
         </div>
       </div>
+
       <div class="user-box">
-        <span class="avatar" id="avatar">U</span>
+        <div id="avatar" class="avatar">U</div>
         <div>
           <strong id="user-name">Usuário</strong>
           <span id="user-role">Perfil</span>
         </div>
       </div>
-      <nav id="main-nav" aria-label="Menu principal">
-        <button type="button" class="nav-item active" data-page="inicio" data-roles="secretaria,gestor,secretario_escolar,professor,monitor_complementar">▦ <span>Painel inicial</span></button>
-        <button type="button" class="nav-item" data-page="cidades" data-roles="proprietario">❖ <span>Licenças e Cidades</span></button>
-        <button type="button" class="nav-item" data-page="escolas" data-roles="secretaria">⌂ <span>Escolas</span></button>
-        <button type="button" class="nav-item" data-page="alunos" data-roles="secretaria,gestor,secretario_escolar">♙ <span>Alunos</span></button>
-        <button type="button" class="nav-item" data-page="matriculas" data-roles="gestor,secretario_escolar">▤ <span>Matrículas</span></button>
-        <button type="button" class="nav-item" data-page="turmas" data-roles="gestor,secretario_escolar">▥ <span>Turmas</span></button>
-        <button type="button" class="nav-item" data-page="diario" data-roles="gestor,secretario_escolar,professor">▧ <span>Diário de classe</span></button>
-        <button type="button" class="nav-item" data-page="matriz" data-roles="secretaria,gestor,secretario_escolar,professor">◫ <span>Matriz curricular</span></button>
-        <button type="button" class="nav-item" data-page="censo" data-roles="gestor,secretario_escolar">◧ <span>Censo escolar</span></button>
-        <button type="button" class="nav-item" data-page="relatorios" data-roles="secretaria,gestor">▤ <span>Relatórios</span></button>
-        <button type="button" class="nav-item" data-page="usuarios" data-roles="secretaria">👤 <span>Usuários</span></button>
+
+      <nav id="main-nav" aria-label="Navegação principal">
+        <button type="button" class="nav-item active" data-page="inicio" data-roles="secretaria,gestor,secretario_escolar,professor,monitor_complementar">
+          <span>🏠</span><span>Painel inicial</span>
+        </button>
+
+        <button type="button" class="nav-item" data-page="cidades" data-roles="proprietario">
+          <span>🏛</span><span>Licenciamento de Cidades</span>
+        </button>
+
+        <button type="button" class="nav-item" data-page="escolas" data-roles="secretaria,gestor,secretario_escolar">
+          <span>🏫</span><span>Unidades escolares</span>
+        </button>
+
+        <!-- BOTÃO PADRÃO DE ALUNOS PARA SECRETARIA -->
+        <button type="button" class="nav-item" data-page="alunos" data-roles="secretaria">
+          <span>🎓</span><span>Alunos</span>
+        </button>
+
+        <!-- MENU SUSPENSO LATERAL NA OPÇÃO ALUNO (EXCLUSIVO GESTOR ESCOLAR E SECRETÁRIO ESCOLAR) -->
+        <div class="sidebar-dropdown" id="sidebar-aluno-dropdown" data-roles="gestor,secretario_escolar">
+          <button type="button" class="nav-item sidebar-dropdown-toggle" id="sidebar-aluno-toggle" aria-expanded="false">
+            <span class="nav-item-left">
+              <span>🎓</span><span>Aluno</span>
+            </span>
+            <span class="sidebar-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div class="sidebar-submenu hidden" id="sidebar-aluno-submenu">
+            <button type="button" class="sidebar-subitem" data-page="cadastro-aluno">
+              <span>➕ Cadastro de Aluno</span>
+            </button>
+            <button type="button" class="sidebar-subitem" data-page="gerenciar-aluno">
+              <span>🗂 Gerenciar Aluno</span>
+            </button>
+            <button type="button" class="sidebar-subitem" data-page="transferencia-rede">
+              <span>🔄 Transferência na Rede</span>
+            </button>
+            <button type="button" class="sidebar-subitem" data-page="transferencia-externa">
+              <span>📤 Transferência Externa</span>
+            </button>
+          </div>
+        </div>
+
+        <button type="button" class="nav-item" data-page="turmas" data-roles="gestor,secretario_escolar">
+          <span>🧩</span><span>Turmas</span>
+        </button>
+
+        <button type="button" class="nav-item" data-page="matriculas" data-roles="gestor,secretario_escolar">
+          <span>🪪</span><span>Matrículas</span>
+        </button>
+
+        <button type="button" class="nav-item" data-page="diario" data-roles="gestor,secretario_escolar,professor">
+          <span>📘</span><span>Diário de classe</span>
+        </button>
+
+        <button type="button" class="nav-item" data-page="matriz" data-roles="secretaria,gestor,secretario_escolar,professor,monitor_complementar">
+          <span>📚</span><span>Matriz curricular</span>
+        </button>
+
+        <button type="button" class="nav-item" data-page="censo" data-roles="gestor,secretario_escolar">
+          <span>📊</span><span>Censo Escolar</span>
+        </button>
+
+        <button type="button" class="nav-item" data-page="relatorios" data-roles="secretaria,gestor,secretario_escolar">
+          <span>📈</span><span>Relatórios</span>
+        </button>
+
+        <button type="button" class="nav-item" data-page="usuarios" data-roles="secretaria">
+          <span>👥</span><span>Usuários</span>
+        </button>
       </nav>
-      <button type="button" id="logout" class="logout">↪ Sair</button>
+
+      <button type="button" id="logout" class="logout">Sair do sistema</button>
     </aside>
 
-    <main class="main">
+    <div class="main">
       <header class="topbar">
         <div>
-          <p class="eyebrow">PLATAFORMA EDUCACIONAL</p>
           <h2 id="page-title">Painel inicial</h2>
         </div>
+
         <div class="inline-controls" data-roles="secretaria">
-          <label class="small">
-            Unidade escolar (Nome, ID ou INEP)
-            <input id="secretaria-school-search" list="secretaria-schools-list" placeholder="Todas as escolas da rede (ou digite nome/ID/INEP)">
-            <datalist id="secretaria-schools-list"></datalist>
-          </label>
-          <button id="secretaria-clear-school" class="secondary small" type="button">Toda a rede</button>
+          <input
+            type="text"
+            id="secretaria-school-search"
+            list="secretaria-schools-list"
+            placeholder="Filtrar escola por nome, ID ou INEP..."
+            style="min-width: 260px;"
+          >
+          <datalist id="secretaria-schools-list"></datalist>
+          <button type="button" id="secretaria-clear-school" class="secondary small">Toda a rede</button>
         </div>
-        <span class="secure">● Ambiente protegido</span>
+
+        <span class="secure">● Sessão ativa</span>
       </header>
 
-      <section id="notice" class="notice hidden" role="status" aria-live="polite"></section>
+      <div id="notice" class="notice hidden" role="status"></div>
 
-      <section id="page-inicio" class="page" data-roles="secretaria,gestor,secretario_escolar,professor,monitor_complementar">
+      <!-- PÁGINA: INÍCIO -->
+      <section id="page-inicio" class="page">
         <div class="welcome">
           <div>
-            <p class="eyebrow light">GESTÃO INTEGRADA</p>
-            <h1>Bem-vindo(a) ao Gestão Escolar</h1>
-            <p id="inicio-school-subtitle">Acompanhe as informações da sua unidade ou de toda a rede municipal.</p>
+            <p class="eyebrow light">Visão Geral</p>
+            <h1>Bem-vindo ao Gestão Escolar</h1>
+            <p id="inicio-school-subtitle">Acompanhe as informações da sua unidade escolar.</p>
           </div>
-          <div id="school-identity-card" data-roles="gestor,secretario_escolar" class="school-identity-card hidden">
-            <div class="school-identity-badge id">
-              ID Escola: <span id="home-school-id">—</span>
-            </div>
-            <div class="school-identity-badge inep">
-              INEP: <span id="home-school-inep">—</span>
-            </div>
-            <div class="school-identity-badge curriculum">
-              Currículo: <span id="home-school-curriculum">—</span>
-            </div>
+          <div id="school-identity-card" class="school-identity-card hidden">
+            <div class="school-identity-badge id">ID Escola: <span id="home-school-id">—</span></div>
+            <div class="school-identity-badge inep">INEP: <span id="home-school-inep">—</span></div>
+            <div class="school-identity-badge curriculum">Oferta: <span id="home-school-curriculum">—</span></div>
           </div>
         </div>
 
-        <div class="stats">
-          <article class="stat"><span>Alunos cadastrados</span><strong id="stat-alunos">—</strong><small>Conforme seu nível de acesso</small></article>
-          <article class="stat"><span>Matrículas ativas</span><strong id="stat-matriculas">—</strong><small>Alunos ativos (Regular e AEE)</small></article>
-          <article class="stat"><span>Enturmados no AEE</span><strong id="stat-aee">—</strong><small>Ativos em turma de AEE</small></article>
-          <article class="stat"><span>Declarados PcD</span><strong id="stat-pcd">—</strong><small>Na unidade / escopo atual</small></article>
-          <article class="stat"><span>Turmas cadastradas</span><strong id="stat-turmas">—</strong><small>Turmas disponíveis</small></article>
-          <article class="stat"><span>Escolas</span><strong id="stat-escolas">—</strong><small>Unidades na rede</small></article>
+        <div class="stats" data-roles="secretaria,gestor,secretario_escolar,professor,monitor_complementar">
+          <div class="stat">
+            <span>Escolas</span>
+            <strong id="stat-escolas">0</strong>
+            <small>Unidades no escopo</small>
+          </div>
+          <div class="stat">
+            <span>Alunos cadastrados</span>
+            <strong id="stat-alunos">0</strong>
+            <small>Total de estudantes</small>
+          </div>
+          <div class="stat">
+            <span>Turmas</span>
+            <strong id="stat-turmas">0</strong>
+            <small>Regular e AEE</small>
+          </div>
+          <div class="stat">
+            <span>Matrículas ativas</span>
+            <strong id="stat-matriculas">0</strong>
+            <small>Alunos enturmados</small>
+          </div>
+          <div class="stat">
+            <span>Atendimento AEE</span>
+            <strong id="stat-aee">0</strong>
+            <small>Alunos em AEE</small>
+          </div>
+          <div class="stat">
+            <span>Estudantes PcD</span>
+            <strong id="stat-pcd">0</strong>
+            <small>Com deficiência declarada</small>
+          </div>
         </div>
 
         <div class="panel">
           <div class="panel-head">
             <div>
               <h3>Acesso rápido</h3>
-              <p class="muted">Escolha uma atividade para começar.</p>
+              <p class="muted small">Atalhos para as rotinas principais do seu perfil.</p>
             </div>
           </div>
           <div class="quick-grid">
-            <button type="button" data-goto="cidades" data-roles="proprietario" class="quick"><b>❖</b><strong>Licenciar cidade</strong><span>Gerenciar municípios e licenças</span></button>
-            <button type="button" data-goto="alunos" data-roles="secretaria,gestor,secretario_escolar" class="quick"><b>＋</b><strong>Cadastrar aluno</strong><span>Adicionar estudante à base</span></button>
-            <button type="button" data-goto="matriculas" data-roles="gestor,secretario_escolar" class="quick"><b>▤</b><strong>Gerenciar matrículas</strong><span>Regular e turma de AEE</span></button>
-            <button type="button" data-goto="turmas" data-roles="gestor,secretario_escolar" class="quick"><b>▥</b><strong>Gerenciar turmas</strong><span>Criar e organizar turmas</span></button>
-            <button type="button" data-goto="diario" data-roles="gestor,secretario_escolar,professor" class="quick"><b>▧</b><strong>Abrir diário</strong><span>Frequência e conteúdo</span></button>
-            <button type="button" data-goto="escolas" data-roles="secretaria" class="quick"><b>⌂</b><strong>Gerenciar escolas</strong><span>Cadastrar unidades escolares</span></button>
-            <button type="button" data-goto="usuarios" data-roles="secretaria" class="quick"><b>👤</b><strong>Gerenciar usuários</strong><span>Contas e permissões</span></button>
-            <button type="button" data-goto="relatorios" data-roles="secretaria,gestor" class="quick"><b>▥</b><strong>Ver relatórios</strong><span>Acompanhar indicadores</span></button>
+            <button type="button" class="quick" data-goto="cadastro-aluno" data-roles="gestor,secretario_escolar">
+              <b>➕</b>
+              <strong>Cadastro de Aluno</strong>
+              <span>Registrar novo estudante na unidade</span>
+            </button>
+            <button type="button" class="quick" data-goto="gerenciar-aluno" data-roles="gestor,secretario_escolar">
+              <b>🗂</b>
+              <strong>Gerenciar Aluno</strong>
+              <span>Consultar e editar dados cadastrais</span>
+            </button>
+            <button type="button" class="quick" data-goto="transferencia-rede" data-roles="gestor,secretario_escolar">
+              <b>🔄</b>
+              <strong>Transferência na Rede</strong>
+              <span>Mover aluno entre escolas municipais</span>
+            </button>
+            <button type="button" class="quick" data-goto="transferencia-externa" data-roles="gestor,secretario_escolar">
+              <b>📤</b>
+              <strong>Transferência Externa</strong>
+              <span>Registrar saída para fora da rede</span>
+            </button>
+            <button type="button" class="quick" data-goto="turmas" data-roles="gestor,secretario_escolar">
+              <b>🧩</b>
+              <strong>Turmas</strong>
+              <span>Criar turmas e vincular professores</span>
+            </button>
+            <button type="button" class="quick" data-goto="matriculas" data-roles="gestor,secretario_escolar">
+              <b>🪪</b>
+              <strong>Matrículas</strong>
+              <span>Enturmar estudantes no ano letivo</span>
+            </button>
+            <button type="button" class="quick" data-goto="diario" data-roles="gestor,secretario_escolar,professor">
+              <b>📘</b>
+              <strong>Diário de classe</strong>
+              <span>Registrar aulas e frequência</span>
+            </button>
+            <button type="button" class="quick" data-goto="censo" data-roles="gestor,secretario_escolar">
+              <b>📊</b>
+              <strong>Censo Escolar</strong>
+              <span>Conferir os 21 blocos da escola</span>
+            </button>
           </div>
         </div>
       </section>
 
-      <section id="page-cidades" class="page hidden" data-roles="proprietario">
+      <!-- PÁGINA: LICENCIAMENTO DE CIDADES (PROPRIETÁRIO) -->
+      <section id="page-cidades" class="page hidden">
+        <div class="stats">
+          <div class="stat">
+            <span>Total de cidades</span>
+            <strong id="cities-total-count">0</strong>
+            <small>Municípios registrados</small>
+          </div>
+          <div class="stat">
+            <span>Licenças ativas</span>
+            <strong id="cities-active-count">0</strong>
+            <small>Acesso liberado</small>
+          </div>
+          <div class="stat">
+            <span>Suspensas / Expiradas</span>
+            <strong id="cities-inactive-count">0</strong>
+            <small>Acesso bloqueado</small>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Licenciamento de Cidades (Área do Proprietário)</h3>
-              <p class="muted">Cadastre os municípios autorizados a utilizar o sistema, defina a senha inicial de acesso e controle a vigência das licenças.</p>
+              <h3>Liberar novo município</h3>
+              <p class="muted small">Cadastre a cidade e o acesso inicial da Secretaria de Educação.</p>
             </div>
           </div>
-
-          <div class="report-grid" style="margin-bottom: 16px;">
-            <div class="report"><span>Cidades cadastradas</span><strong id="cities-total-count">—</strong></div>
-            <div class="report"><span>Licenças ativas</span><strong id="cities-active-count">—</strong></div>
-            <div class="report"><span>Licenças expiradas / suspensas</span><strong id="cities-inactive-count">—</strong></div>
-          </div>
-
           <form id="city-license-form" class="form-grid">
-            <label>Município
-              <input name="city_name" required maxlength="120" placeholder="Ex.: São José dos Campos">
-            </label>
-            <label>Estado (UF)
-              <select name="state_uf" required>
-                <option value="">Selecione</option>
-                <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option>
-                <option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option>
-                <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
-                <option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
-                <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option>
-                <option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option>
-                <option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option>
-                <option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
-                <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
-              </select>
-            </label>
-            <label>Código IBGE (opcional)
-              <input name="ibge_code" maxlength="10" inputmode="numeric" placeholder="Ex.: 3549904">
-            </label>
-            <label>CNPJ Prefeitura / Secretaria
-              <input name="cnpj" maxlength="18" placeholder="00.000.000/0001-00">
-            </label>
-            <label>E-mail do Administrador (Secretaria)
-              <input name="admin_email" type="email" required maxlength="160" placeholder="educacao@municipio.gov.br">
-            </label>
-            <label>Senha para login (Administrador)
-              <input name="admin_password" type="password" autocomplete="new-password" required minlength="6" maxlength="128" placeholder="Mínimo 6 caracteres">
-            </label>
-            <label>Responsável / Contato
-              <input name="contact_name" maxlength="160" placeholder="Nome do Secretário(a) ou TI">
-            </label>
-            <label>Telefone de contato
-              <input name="contact_phone" maxlength="30" placeholder="(00) 00000-0000">
-            </label>
-            <label>Limite de escolas
-              <input name="max_schools" type="number" min="1" max="5000" value="50" required>
-            </label>
-            <label>Validade da licença
-              <input name="expires_at" type="date" required>
-            </label>
-            <label>Status da licença
-              <select name="status" required>
-                <option value="ativa" selected>Ativa</option>
+            <label>Município *<input type="text" name="city_name" required placeholder="Ex.: Juazeiro"></label>
+            <label>Estado (UF) *<input type="text" name="state_uf" required maxlength="2" placeholder="BA"></label>
+            <label>Código IBGE<input type="text" name="ibge_code" maxlength="7" placeholder="2918407"></label>
+            <label>CNPJ da Prefeitura/Sec.<input type="text" name="cnpj" placeholder="00.000.000/0001-00"></label>
+            <label>E-mail do Administrador *<input type="email" name="admin_email" required placeholder="educacao@municipio.gov.br"></label>
+            <label>Senha inicial *<input type="password" name="admin_password" required minlength="6" placeholder="Mínimo 6 caracteres"></label>
+            <label>Responsável / Secretário(a)<input type="text" name="contact_name" placeholder="Nome completo"></label>
+            <label>Telefone<input type="text" name="contact_phone" placeholder="(00) 00000-0000"></label>
+            <label>Limite de escolas<input type="number" name="max_schools" value="50" min="1"></label>
+            <label>Validade da licença *<input type="date" name="expires_at" required></label>
+            <label>Status
+              <select name="status">
+                <option value="ativa">Ativa</option>
                 <option value="suspensa">Suspensa</option>
-                <option value="expirada">Expirada</option>
               </select>
             </label>
-            <label style="grid-column: 1 / -1;">Observações contratuais
-              <input name="notes" maxlength="250" placeholder="Ex.: Contrato nº 012/2026 - Vigência 12 meses">
-            </label>
-            <button class="primary" type="submit">Liberar licença para cidade</button>
+            <label>Observações<input type="text" name="notes" placeholder="Contrato / Empenho"></label>
+            <button type="submit" class="primary">Liberar cidade</button>
           </form>
+        </div>
 
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Cidades licenciadas</h3>
+              <p class="muted small">Controle de vigência e bloqueio de municípios.</p>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Município / UF</th>
+                  <th>Município</th>
                   <th>CNPJ</th>
-                  <th>E-mail Admin</th>
-                  <th>Limite Escolas</th>
+                  <th>Administrador</th>
+                  <th>Escolas</th>
                   <th>Validade</th>
                   <th>Status</th>
                   <th>Ações</th>
                 </tr>
               </thead>
-              <tbody id="cities-body">
-                <tr><td colspan="7">Carregando licenças...</td></tr>
-              </tbody>
+              <tbody id="cities-body"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <section id="page-escolas" class="page hidden" data-roles="secretaria">
-        <div class="panel">
+      <!-- PÁGINA: UNIDADES ESCOLARES -->
+      <section id="page-escolas" class="page hidden">
+        <div class="panel" data-roles="secretaria">
           <div class="panel-head">
             <div>
-              <h3>Unidades escolares</h3>
-              <p class="muted">Cadastre a unidade escolar preenchendo e salvando cada bloco temático do Censo Escolar (começando por Identificação Escola).</p>
+              <h3>Cadastrar unidade escolar</h3>
+              <p class="muted small">Preencha os blocos temáticos do Censo e clique em Cadastrar escola.</p>
             </div>
+            <button type="button" id="toggle-school-census-panel" class="secondary small">Mostrar / Ocultar blocos</button>
           </div>
-          <form id="school-form" class="form-grid">
-            <div style="grid-column: 1 / -1;padding:14px;border-radius:10px;border:1px solid #d5e2d0;background:#f8fbf7;">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-                <div>
-                  <strong>Blocos temáticos do Censo Escolar</strong>
-                  <p class="muted small" id="school-census-draft-status" style="margin:2px 0 0;">Clique em um bloco, preencha os campos e clique em "Salvar bloco". Ao finalizar, clique em "Cadastrar escola".</p>
-                </div>
-                <button type="button" class="secondary small" id="toggle-school-census-panel">Abrir / Ocultar blocos do Censo</button>
-              </div>
-              <div id="school-census-panel" style="margin-top:12px;">
-                <div id="school-census-modules-grid" class="census-modules-grid"></div>
-                <div id="school-census-module-editor" class="hidden" style="margin-top:14px;padding:14px;border-radius:8px;background:#ffffff;border:1px solid #c9dfbe;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-                    <strong id="school-census-editor-title">Bloco</strong>
-                    <div style="display:flex;gap:8px;align-items:center;">
-                      <button type="button" class="primary small" id="school-census-apply-module">Salvar bloco</button>
-                      <button type="button" class="secondary small" id="school-census-cancel-module">Fechar</button>
-                    </div>
-                  </div>
-                  <div id="school-census-module-fields" class="form-grid"></div>
+
+          <form id="school-form">
+            <div id="school-census-panel" class="panel-sub">
+              <p id="school-census-draft-status" class="small muted">0 de 21 blocos salvos no rascunho.</p>
+              <div id="school-census-modules-grid" class="census-modules-grid"></div>
+
+              <div id="school-census-module-editor" class="panel-sub hidden">
+                <h4 id="school-census-editor-title">Bloco</h4>
+                <div id="school-census-module-fields" class="form-grid"></div>
+                <div class="inline-controls">
+                  <button type="button" id="school-census-apply-module" class="primary small">Salvar bloco</button>
+                  <button type="button" id="school-census-cancel-module" class="secondary small">Fechar bloco</button>
                 </div>
               </div>
             </div>
 
-            <button class="primary" type="submit">Cadastrar escola</button>
+            <div style="margin-top: 14px;">
+              <button type="submit" class="primary">Cadastrar escola</button>
+            </div>
           </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Escolas cadastradas</h3>
+              <p class="muted small">Clique em uma linha (perfil Secretaria) para filtrar os dados da unidade.</p>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>ID Escola</th><th>Escola</th><th>Gestor</th><th>Código INEP</th><th>Currículo</th><th>Endereço</th><th>Telefone</th><th>Ações</th></tr>
+                <tr>
+                  <th>ID Escola</th>
+                  <th>Nome</th>
+                  <th>Gestor(a)</th>
+                  <th>INEP</th>
+                  <th>Oferta</th>
+                  <th>Endereço</th>
+                  <th>Telefone</th>
+                  <th>Ações</th>
+                </tr>
               </thead>
-              <tbody id="schools-body"><tr><td colspan="8">Carregando...</td></tr></tbody>
+              <tbody id="schools-body"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <section id="page-alunos" class="page hidden" data-roles="secretaria,gestor,secretario_escolar">
+      <!-- PÁGINA: ALUNOS (VISÃO SECRETARIA) -->
+      <section id="page-alunos" class="page hidden">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Cadastro de alunos</h3>
-              <p class="muted">Cadastre somente os dados necessários à finalidade educacional, incluindo Raça/Cor e declaração PcD.</p>
+              <h3>Estudantes cadastrados na rede</h3>
+              <p class="muted small">Consulta consolidada das unidades escolares.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome completo</th>
+                  <th>CPF</th>
+                  <th>Nascimento</th>
+                  <th>Cor/Raça</th>
+                  <th>PcD</th>
+                  <th>Responsável</th>
+                  <th>Escola</th>
+                </tr>
+              </thead>
+              <tbody id="students-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PÁGINA: CADASTRO DE ALUNO (MENU SUSPENSO ALUNO -> CADASTRO DE ALUNO) -->
+      <section id="page-cadastro-aluno" class="page hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Cadastro de Aluno</h3>
+              <p class="muted small">Preencha os dados pessoais e do responsável para incluir o estudante na unidade escolar.</p>
             </div>
           </div>
           <form id="student-form" class="form-grid">
-            <label>Nome completo<input name="full_name" required maxlength="160"></label>
-            <label>CPF do aluno<input name="cpf" maxlength="14" inputmode="numeric" placeholder="000.000.000-00"></label>
-            <label>Data de nascimento<input name="birth_date" type="date" required></label>
-            <label>Raça/Cor
-              <select name="race_color" required>
-                <option value="Não declarada" selected>Não declarada</option>
+            <label>Nome completo *<input type="text" name="full_name" required placeholder="Nome completo do estudante"></label>
+            <label>CPF<input type="text" name="cpf" maxlength="14" placeholder="000.000.000-00"></label>
+            <label>Data de nascimento<input type="date" name="birth_date"></label>
+            <label>Cor / Raça
+              <select name="race_color">
+                <option value="Não declarada">Não declarada</option>
                 <option value="Branca">Branca</option>
                 <option value="Preta">Preta</option>
                 <option value="Parda">Parda</option>
@@ -317,607 +457,687 @@
                 <option value="Indígena">Indígena</option>
               </select>
             </label>
-            <label>Declarado PcD
-              <select name="is_pcd" required>
-                <option value="false" selected>Não</option>
+            <label>Estudante PcD?
+              <select name="is_pcd">
+                <option value="false">Não</option>
                 <option value="true">Sim</option>
               </select>
             </label>
-            <label>Nome do responsável<input name="guardian_name" maxlength="160"></label>
-            <label>Contato do responsável<input name="guardian_phone" maxlength="30"></label>
-            <label>Escola<select name="school_id" id="student-school" required><option value="">Selecione</option></select></label>
-            <label>Observação administrativa<input name="notes" maxlength="250"></label>
-            <button class="primary" type="submit">Salvar aluno</button>
+            <label>Nome do responsável<input type="text" name="guardian_name" placeholder="Mãe, pai ou responsável legal"></label>
+            <label>Telefone do responsável<input type="text" name="guardian_phone" placeholder="(00) 90000-0000"></label>
+            <label>Unidade escolar<select name="school_id" id="student-school"></select></label>
+            <label style="grid-column: 1 / -1;">Observações pedagógicas / saúde<input type="text" name="notes" placeholder="Alergias, laudos ou observações gerais"></label>
+            <button type="submit" class="primary">Salvar cadastro do aluno</button>
           </form>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Aluno</th><th>CPF</th><th>Nascimento</th><th>Raça/Cor</th><th>PcD</th><th>Responsável</th><th>Escola</th></tr>
-              </thead>
-              <tbody id="students-body"><tr><td colspan="7">Carregando...</td></tr></tbody>
-            </table>
-          </div>
         </div>
       </section>
 
-      <section id="page-matriculas" class="page hidden" data-roles="gestor,secretario_escolar">
+      <!-- PÁGINA: GERENCIAR ALUNO (MENU SUSPENSO ALUNO -> GERENCIAR ALUNO) -->
+      <section id="page-gerenciar-aluno" class="page hidden">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Matrículas (Regular e AEE)</h3>
-              <p class="muted">Permite vincular o aluno a 1 turma regular e 1 turma de AEE no ano letivo e informar transporte escolar.</p>
+              <h3>Gerenciar Aluno</h3>
+              <p class="muted small">Pesquise estudantes da unidade escolar para visualizar situação de matrícula ou atualizar dados cadastrais.</p>
+            </div>
+            <div class="inline-controls">
+              <input type="text" id="manage-student-search" placeholder="Buscar por nome, CPF ou responsável..." style="min-width: 260px;">
             </div>
           </div>
-          <div class="report-grid" style="margin-bottom: 14px;">
-            <div class="report"><span>Enturmados na turma de AEE</span><strong id="enrollments-aee-count">—</strong></div>
-            <div class="report"><span>Alunos declarados PcD na unidade</span><strong id="enrollments-pcd-count">—</strong></div>
-            <div class="report"><span>Matrículas ativas no escopo</span><strong id="enrollments-active-count">—</strong></div>
+
+          <div id="edit-student-box" class="panel-sub hidden">
+            <h4>Editar dados do aluno</h4>
+            <form id="edit-student-form" class="form-grid">
+              <input type="hidden" name="id" id="edit-student-id">
+              <label>Nome completo *<input type="text" name="full_name" id="edit-student-name" required></label>
+              <label>CPF<input type="text" name="cpf" id="edit-student-cpf" maxlength="14"></label>
+              <label>Data de nascimento<input type="date" name="birth_date" id="edit-student-birth"></label>
+              <label>Cor / Raça
+                <select name="race_color" id="edit-student-race">
+                  <option value="Não declarada">Não declarada</option>
+                  <option value="Branca">Branca</option>
+                  <option value="Preta">Preta</option>
+                  <option value="Parda">Parda</option>
+                  <option value="Amarela">Amarela</option>
+                  <option value="Indígena">Indígena</option>
+                </select>
+              </label>
+              <label>Estudante PcD?
+                <select name="is_pcd" id="edit-student-pcd">
+                  <option value="false">Não</option>
+                  <option value="true">Sim</option>
+                </select>
+              </label>
+              <label>Responsável<input type="text" name="guardian_name" id="edit-student-guardian"></label>
+              <label>Telefone do responsável<input type="text" name="guardian_phone" id="edit-student-phone"></label>
+              <label>Observações<input type="text" name="notes" id="edit-student-notes"></label>
+              <div class="inline-controls">
+                <button type="submit" class="primary small">Salvar alterações</button>
+                <button type="button" id="cancel-edit-student" class="secondary small">Cancelar</button>
+              </div>
+            </form>
           </div>
-          <form id="enrollment-form" class="form-grid">
-            <label>Aluno<select name="student_id" id="enrollment-student" required><option value="">Selecione</option></select></label>
-            <label>Turma (Regular ou AEE)<select name="class_id" id="enrollment-class" required><option value="">Selecione</option></select></label>
-            <label>Ano letivo<input name="school_year" type="number" min="2020" max="2100" required></label>
-            <label>Transporte escolar
-              <select name="uses_school_transport" required>
-                <option value="false" selected>Não</option>
-                <option value="true">Sim</option>
-              </select>
-            </label>
-            <label>Situação<select name="status"><option value="ativa">Ativa</option><option value="aguardando">Aguardando</option><option value="transferida">Transferida</option><option value="cancelada">Cancelada</option></select></label>
-            <button class="primary" type="submit">Registrar matrícula</button>
-          </form>
+
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Aluno</th><th>PcD</th><th>Turma</th><th>Tipo de Turma</th><th>Transporte escolar</th><th>Ano</th><th>Situação</th></tr>
+                <tr>
+                  <th>Nome completo</th>
+                  <th>CPF</th>
+                  <th>Nascimento</th>
+                  <th>PcD</th>
+                  <th>Responsável</th>
+                  <th>Situação</th>
+                  <th>Ações</th>
+                </tr>
               </thead>
-              <tbody id="enrollments-body"><tr><td colspan="7">Carregando...</td></tr></tbody>
+              <tbody id="manage-students-body"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <section id="page-turmas" class="page hidden" data-roles="gestor,secretario_escolar">
+      <!-- PÁGINA: TRANSFERÊNCIA NA REDE (MENU SUSPENSO ALUNO -> TRANSFERÊNCIA NA REDE) -->
+      <section id="page-transferencia-rede" class="page hidden">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Cadastrar turma</h3>
-              <p class="muted">Organização por etapa, modalidade, mediação, horário, currículo e vínculos. A quantidade de alunos ativos aparece na tabela abaixo.</p>
+              <h3>Transferência na Rede Municipal</h3>
+              <p class="muted small">Transfira o estudante desta unidade para outra escola da mesma rede municipal, encerrando a enturmação atual.</p>
+            </div>
+          </div>
+          <form id="internal-transfer-form" class="form-grid">
+            <label>Aluno da unidade *
+              <select name="student_id" id="internal-transfer-student" required></select>
+            </label>
+            <label>Escola de destino (na rede) *
+              <select name="target_school_id" id="internal-transfer-school" required></select>
+            </label>
+            <label>Data da transferência *
+              <input type="date" name="transfer_date" id="internal-transfer-date" required>
+            </label>
+            <label>Motivo / Observação
+              <input type="text" name="reason" placeholder="Ex.: Mudança de endereço no município">
+            </label>
+            <button type="submit" class="primary">Confirmar transferência na rede</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Histórico de transferências na rede</h3>
+              <p class="muted small">Movimentações registradas entre unidades municipais.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Aluno</th>
+                  <th>Escola de origem</th>
+                  <th>Escola de destino</th>
+                  <th>Observação</th>
+                </tr>
+              </thead>
+              <tbody id="internal-transfers-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PÁGINA: TRANSFERÊNCIA EXTERNA (MENU SUSPENSO ALUNO -> TRANSFERÊNCIA EXTERNA) -->
+      <section id="page-transferencia-externa" class="page hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Transferência Externa</h3>
+              <p class="muted small">Registre a saída do estudante para escola estadual, federal, privada ou outro município.</p>
+            </div>
+          </div>
+          <form id="external-transfer-form" class="form-grid">
+            <label>Aluno da unidade *
+              <select name="student_id" id="external-transfer-student" required></select>
+            </label>
+            <label>Instituição / Município de destino *
+              <input type="text" name="destination_school" required placeholder="Ex.: Colégio Estadual / Outro Município">
+            </label>
+            <label>Data de emissão / saída *
+              <input type="date" name="transfer_date" id="external-transfer-date" required>
+            </label>
+            <label>Motivo / Guia de transferência
+              <input type="text" name="reason" placeholder="Ex.: Solicitação do responsável legal">
+            </label>
+            <button type="submit" class="primary">Registrar transferência externa</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Histórico de transferências externas</h3>
+              <p class="muted small">Estudantes desligados por transferência externa.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Aluno</th>
+                  <th>Unidade de origem</th>
+                  <th>Destino informado</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody id="external-transfers-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PÁGINA: TURMAS -->
+      <section id="page-turmas" class="page hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Criar turma</h3>
+              <p class="muted small">Cadastre turmas regulares ou de Atendimento Educacional Especializado (AEE).</p>
             </div>
           </div>
           <form id="class-form" class="form-grid">
-            <label>Nome turma
-              <input name="name" required maxlength="160" placeholder="Ex.: 5º ano A ou Sala AEE">
-            </label>
-            <label>Quant. Alunos
-              <input name="max_students" type="number" min="1" max="200" value="30" required>
-            </label>
-            <label>Comp. Turma
-              <input name="class_complement" maxlength="30" placeholder="Ex: A, B...">
-            </label>
-            <label>Cód. INEP
-              <input name="inep_code" maxlength="30" placeholder="Bloqueado" readonly disabled aria-disabled="true">
-            </label>
-
-            <label>Modalidade
-              <select name="modality" required>
-                <option value="Regular" selected>Regular</option>
-                <option value="Educação Especial">Educação Especial</option>
-                <option value="Educação de Jovens e Adultos (EJA)">Educação de Jovens e Adultos (EJA)</option>
-                <option value="Educação Profissional">Educação Profissional</option>
-              </select>
-            </label>
-            <label>Etapa
+            <label>Nome da turma *<input type="text" name="name" required placeholder="Ex.: 1º Ano A"></label>
+            <label>Complemento<input type="text" name="class_complement" placeholder="Ex.: Sala 02 / Anexo"></label>
+            <label>Etapa de ensino *
               <select name="grade_level" required>
-                <option value="">Selecione uma etapa de ensino</option>
-                <option value="Educação Infantil - Creche (0 a 3 anos)">Educação Infantil - Creche (0 a 3 anos)</option>
-                <option value="Educação Infantil - Pré-escola (4 e 5 anos)">Educação Infantil - Pré-escola (4 e 5 anos)</option>
-                <option value="Educação Infantil - Unificada (0 a 5 anos)">Educação Infantil - Unificada (0 a 5 anos)</option>
-                <option value="Educação Infantil e Ensino Fundamental (8 e 9 anos) Multietapa">Educação Infantil e Ensino Fundamental (8 e 9 anos) Multietapa</option>
-                <option value="Ensino Fundamental de 9 anos - 1º Ano">Ensino Fundamental de 9 anos - 1º Ano</option>
-                <option value="Ensino Fundamental de 9 anos - 2º Ano">Ensino Fundamental de 9 anos - 2º Ano</option>
-                <option value="Ensino Fundamental de 9 anos - 3º Ano">Ensino Fundamental de 9 anos - 3º Ano</option>
-                <option value="Ensino Fundamental de 9 anos - 4º Ano">Ensino Fundamental de 9 anos - 4º Ano</option>
-                <option value="Ensino Fundamental de 9 anos - 5º Ano">Ensino Fundamental de 9 anos - 5º Ano</option>
-                <option value="Ensino Fundamental de 9 anos - 6º Ano">Ensino Fundamental de 9 anos - 6º Ano</option>
-                <option value="Ensino Fundamental de 9 anos - 7º Ano">Ensino Fundamental de 9 anos - 7º Ano</option>
-                <option value="Ensino Fundamental de 9 anos - 8º Ano">Ensino Fundamental de 9 anos - 8º Ano</option>
-                <option value="Ensino Fundamental de 9 anos - 9º Ano">Ensino Fundamental de 9 anos - 9º Ano</option>
-                <option value="Ensino Fundamental de 9 anos - Multi">Ensino Fundamental de 9 anos - Multi</option>
-                <option value="EJA - Ensino Fundamental (Anos Iniciais)">EJA - Ensino Fundamental (Anos Iniciais)</option>
-                <option value="EJA - Ensino Fundamental (Anos Finais)">EJA - Ensino Fundamental (Anos Finais)</option>
+                <option value="">Selecione</option>
+                <option value="Educação Infantil - Creche">Educação Infantil - Creche</option>
+                <option value="Educação Infantil - Pré-escola">Educação Infantil - Pré-escola</option>
+                <option value="1º Ano - Fundamental I">1º Ano - Fundamental I</option>
+                <option value="2º Ano - Fundamental I">2º Ano - Fundamental I</option>
+                <option value="3º Ano - Fundamental I">3º Ano - Fundamental I</option>
+                <option value="4º Ano - Fundamental I">4º Ano - Fundamental I</option>
+                <option value="5º Ano - Fundamental I">5º Ano - Fundamental I</option>
+                <option value="6º Ano - Fundamental II">6º Ano - Fundamental II</option>
+                <option value="7º Ano - Fundamental II">7º Ano - Fundamental II</option>
+                <option value="8º Ano - Fundamental II">8º Ano - Fundamental II</option>
+                <option value="9º Ano - Fundamental II">9º Ano - Fundamental II</option>
+                <option value="EJA - Educação de Jovens e Adultos">EJA - Educação de Jovens e Adultos</option>
+                <option value="AEE - Atendimento Educacional Especializado">AEE - Atendimento Educacional Especializado</option>
               </select>
             </label>
-            <label>Tipo de mediação didático-pedagógica
-              <select name="mediation_type" required>
-                <option value="Presencial" selected>Presencial</option>
-                <option value="Semipresencial">Semipresencial</option>
-                <option value="Educação a distância">Educação a distância</option>
+            <label>Modalidade
+              <select name="modality">
+                <option value="Regular">Regular</option>
+                <option value="Educação Especial">Educação Especial</option>
+                <option value="EJA">EJA</option>
               </select>
             </label>
-
-            <label>Escolarização
-              <select name="schooling" required>
-                <option value="Sim" selected>Sim</option>
+            <label>Atendimento AEE?
+              <select name="aee_service">
                 <option value="Não">Não</option>
-              </select>
-            </label>
-            <label>Atividade Complementar
-              <select name="complementary_activity" required>
-                <option value="Não" selected>Não</option>
                 <option value="Sim">Sim</option>
               </select>
             </label>
-            <label>Currículo
-              <select name="curriculum_type" required>
-                <option value="Comum" selected>Comum</option>
-                <option value="Diversificado">Diversificado</option>
-                <option value="Comum e Diversificado">Comum e Diversificado</option>
-              </select>
-            </label>
-            <label>Horário Inicial
-              <input name="start_time" type="time">
-            </label>
-            <label>Horário Final
-              <input name="end_time" type="time">
-            </label>
-
-            <label>Tolerância de atraso
-              <select name="late_tolerance" required>
-                <option value="Padrão do sistema" selected>Padrão do sistema</option>
-                <option value="Sem tolerância">Sem tolerância</option>
-                <option value="5 minutos">5 minutos</option>
-                <option value="10 minutos">10 minutos</option>
-                <option value="15 minutos">15 minutos</option>
-                <option value="20 minutos">20 minutos</option>
-                <option value="30 minutos">30 minutos</option>
-              </select>
-            </label>
-            <label>Aten. educacional especializado - AEE
-              <select name="aee_service" required>
-                <option value="Não" selected>Não</option>
-                <option value="Sim">Sim</option>
-              </select>
-            </label>
-            <label>Local de funcionamento diferenciado
-              <select name="differentiated_location" required>
-                <option value="A turma não está em local de funcionamento diferenciado" selected>A turma não está em local de funcionamento diferenciado</option>
-                <option value="Unidade de atendimento socioeducativo">Unidade de atendimento socioeducativo</option>
-                <option value="Unidade prisional">Unidade prisional</option>
-                <option value="Sala anexa">Sala anexa</option>
-                <option value="Assentamento">Assentamento</option>
-                <option value="Terra indígena">Terra indígena</option>
-                <option value="Comunidade quilombola">Comunidade quilombola</option>
-              </select>
-            </label>
-
-            <label>Língua Portuguesa como Segunda Língua
-              <select name="portuguese_second_language" required>
-                <option value="Não oferece disciplina" selected>Não oferece disciplina</option>
-                <option value="Oferece disciplina">Oferece disciplina</option>
-              </select>
-            </label>
-            <label>Estágio Curricular Supervisionado
-              <select name="supervised_internship" required>
-                <option value="Não oferece disciplina" selected>Não oferece disciplina</option>
-                <option value="Oferece disciplina">Oferece disciplina</option>
-              </select>
-            </label>
-
-            <label style="grid-column: 1 / -1;">Classe bilíngue de surdos tendo a Libras (Língua Brasileira de Sinais) como língua de instrução, ensino, comunicação e interação e a língua portuguesa escrita como segunda língua
-              <select name="bilingual_deaf_class" required>
-                <option value="Não" selected>Não</option>
-                <option value="Sim">Sim</option>
-              </select>
-            </label>
-
             <label>Turno
-              <select name="shift" required>
+              <select name="shift">
                 <option value="Matutino">Matutino</option>
                 <option value="Vespertino">Vespertino</option>
                 <option value="Noturno">Noturno</option>
                 <option value="Integral">Integral</option>
               </select>
             </label>
-            <label>Ano letivo
-              <input name="school_year" type="number" min="2020" max="2100" required>
-            </label>
-            <label>Escola
-              <select name="school_id" id="class-school" required><option value="">Selecione</option></select>
-            </label>
-            <label>Professor responsável
-              <select name="teacher_id" id="class-teacher"><option value="">Não definido</option></select>
-            </label>
-            <button class="primary" type="submit">Criar turma</button>
+            <label>Horário início<input type="time" name="start_time"></label>
+            <label>Horário término<input type="time" name="end_time"></label>
+            <label>Capacidade de vagas<input type="number" name="max_students" value="30" min="1"></label>
+            <label>Ano letivo<input type="number" name="school_year" required></label>
+            <label>Unidade escolar<select name="school_id" id="class-school"></select></label>
+            <label>Professor regente<select name="teacher_id" id="class-teacher"></select></label>
+            <button type="submit" class="primary">Criar turma</button>
           </form>
+        </div>
 
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Turmas cadastradas</h3>
+              <p class="muted small">Altere o professor regente diretamente na tabela.</p>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Cód. Turma</th>
+                  <th>Código</th>
                   <th>Turma</th>
-                  <th>Comp.</th>
+                  <th>Complemento</th>
                   <th>Etapa</th>
                   <th>Modalidade</th>
                   <th>AEE</th>
-                  <th>Alunos ativos</th>
+                  <th>Ativos</th>
                   <th>Horário</th>
                   <th>Ano</th>
                   <th>Escola</th>
                   <th>Professor</th>
                 </tr>
               </thead>
-              <tbody id="classes-body"><tr><td colspan="11">Carregando...</td></tr></tbody>
+              <tbody id="classes-body"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <section id="page-diario" class="page hidden" data-roles="gestor,secretario_escolar,professor">
+      <!-- PÁGINA: MATRÍCULAS -->
+      <section id="page-matriculas" class="page hidden">
+        <div class="stats">
+          <div class="stat">
+            <span>Matrículas ativas</span>
+            <strong id="enrollments-active-count">0</strong>
+          </div>
+          <div class="stat">
+            <span>Enturmados em AEE</span>
+            <strong id="enrollments-aee-count">0</strong>
+          </div>
+          <div class="stat">
+            <span>Estudantes PcD</span>
+            <strong id="enrollments-pcd-count">0</strong>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Diário de classe</h3>
-              <p class="muted">Registro pedagógico da aula, frequência e avaliação.</p>
+              <h3>Enturmar aluno</h3>
+              <p class="muted small">Permite até 1 turma regular e 1 turma AEE por ano letivo.</p>
             </div>
           </div>
-          <form id="lesson-form" class="form-grid">
-            <label>Turma<select name="class_id" id="diary-class" required><option value="">Selecione</option></select></label>
-            <label>Data da aula<input name="lesson_date" type="date" required></label>
-            <label>Componente curricular<input name="subject" required maxlength="100" placeholder="Ex.: Língua Portuguesa"></label>
-            <label>Conteúdo ministrado<input name="content" required maxlength="500"></label>
-            <label>Atividade / metodologia<input name="activity" maxlength="500"></label>
-            <label>Observações<input name="notes" maxlength="300"></label>
-            <button class="primary" type="submit">Registrar aula</button>
+          <form id="enrollment-form" class="form-grid">
+            <label>Aluno *<select name="student_id" id="enrollment-student" required></select></label>
+            <label>Turma *<select name="class_id" id="enrollment-class" required></select></label>
+            <label>Ano letivo *<input type="number" name="school_year" required></label>
+            <label>Usa transporte escolar?
+              <select name="uses_school_transport">
+                <option value="false">Não</option>
+                <option value="true">Sim</option>
+              </select>
+            </label>
+            <label>Status
+              <select name="status">
+                <option value="ativa">Ativa</option>
+                <option value="transferida">Transferida</option>
+                <option value="cancelada">Cancelada</option>
+              </select>
+            </label>
+            <button type="submit" class="primary">Confirmar matrícula</button>
           </form>
-          <div class="panel-sub">
-            <h4>Frequência dos alunos</h4>
-            <p class="muted">Selecione uma turma e data para carregar os alunos matriculados.</p>
-            <div class="inline-controls">
-              <label>Turma<select id="attendance-class"><option value="">Selecione</option></select></label>
-              <label>Data<input id="attendance-date" type="date"></label>
-              <button id="load-attendance" class="secondary" type="button">Carregar alunos</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Matrículas registradas</h3>
             </div>
-            <div id="attendance-list" class="attendance-list"></div>
-            <button id="save-attendance" class="primary hidden" type="button">Salvar frequência</button>
           </div>
-          <div class="panel-sub">
-            <h4>Últimas aulas registradas</h4>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Data</th><th>Turma</th><th>Componente</th><th>Conteúdo</th></tr>
-                </thead>
-                <tbody id="lessons-body"><tr><td colspan="4">Carregando...</td></tr></tbody>
-              </table>
-            </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Aluno</th>
+                  <th>PcD</th>
+                  <th>Turma</th>
+                  <th>Tipo</th>
+                  <th>Transporte</th>
+                  <th>Ano</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="enrollments-body"></tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      <section id="page-matriz" class="page hidden" data-roles="secretaria,gestor,secretario_escolar,professor">
+      <!-- PÁGINA: DIÁRIO DE CLASSE -->
+      <section id="page-diario" class="page hidden">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Matriz curricular por etapa de ensino</h3>
-              <p class="muted">Defina componentes obrigatórios e atividades complementares não obrigatórias por etapa.</p>
+              <h3>Registro de aula</h3>
+              <p class="muted small">Informe o conteúdo ministrado na turma.</p>
             </div>
           </div>
-          <form id="curriculum-form" class="form-grid" data-roles="secretaria,gestor">
-            <label>Etapa de ensino
+          <form id="lesson-form" class="form-grid">
+            <label>Turma *<select name="class_id" id="diary-class" required></select></label>
+            <label>Data da aula *<input type="date" name="lesson_date" required></label>
+            <label>Componente curricular *<input type="text" name="subject" required placeholder="Ex.: Língua Portuguesa"></label>
+            <label style="grid-column: 1 / -1;">Conteúdo ministrado *<input type="text" name="content" required placeholder="Descrição das atividades e objetos de conhecimento"></label>
+            <button type="submit" class="primary">Registrar aula</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Chamada / Frequência</h3>
+            </div>
+            <div class="inline-controls">
+              <select id="attendance-class"></select>
+              <input type="date" id="attendance-date">
+              <button type="button" id="load-attendance" class="secondary">Carregar alunos</button>
+            </div>
+          </div>
+          <div id="attendance-list" class="attendance-list"></div>
+          <div>
+            <button type="button" id="save-attendance" class="primary hidden">Salvar frequência</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Últimas aulas registradas</h3>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Turma</th>
+                  <th>Componente</th>
+                  <th>Conteúdo</th>
+                </tr>
+              </thead>
+              <tbody id="lessons-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PÁGINA: MATRIZ CURRICULAR -->
+      <section id="page-matriz" class="page hidden">
+        <div class="panel" data-roles="secretaria,gestor">
+          <div class="panel-head">
+            <div>
+              <h3>Adicionar componente à matriz curricular</h3>
+            </div>
+          </div>
+          <form id="curriculum-form" class="form-grid">
+            <label>Etapa *
               <select name="stage" id="curriculum-stage-select" required>
                 <option value="Educação Infantil">Educação Infantil</option>
                 <option value="Ensino Fundamental I (1º ao 5º ano)">Ensino Fundamental I (1º ao 5º ano)</option>
                 <option value="Ensino Fundamental II (6º ao 9º ano)">Ensino Fundamental II (6º ao 9º ano)</option>
-                <option value="EJA (Educação de Jovens e Adultos)">EJA (Educação de Jovens e Adultos)</option>
+                <option value="EJA">EJA</option>
               </select>
             </label>
-            <label>Componente / Atividade
-              <input name="subject" required maxlength="120" placeholder="Ex.: Robótica / Música / Matemática">
-            </label>
-            <label>Área / Eixo
-              <input name="area" maxlength="120" placeholder="Ex.: Cultura Digital / Arte / Linguagens">
-            </label>
-            <label>Natureza na matriz
-              <select name="requirement_type" id="curriculum-requirement-select" required>
+            <label>Componente / Atividade *<input type="text" name="subject" required placeholder="Ex.: Matemática ou Oficina de Música"></label>
+            <label>Área do conhecimento<input type="text" name="area" placeholder="Ex.: Linguagens"></label>
+            <label>Tipo de oferta
+              <select name="requirement_type" id="curriculum-requirement-select">
                 <option value="obrigatoria">Obrigatória</option>
-                <option value="complementar_nao_obrigatoria">Atividade complementar (Não obrigatória)</option>
+                <option value="complementar_nao_obrigatoria">Complementar (Não obrigatória)</option>
               </select>
             </label>
-            <label>Carga horária anual (h)
-              <input name="annual_hours" type="number" min="1" max="2000" required placeholder="Ex.: 80">
-            </label>
-            <button class="primary" type="submit">Adicionar à matriz</button>
+            <label>Carga horária anual (h)<input type="number" name="annual_hours" value="80" min="1"></label>
+            <button type="submit" class="primary">Adicionar item</button>
           </form>
+        </div>
 
-          <div class="inline-controls" style="margin-top: 12px;">
-            <label class="small">
-              Filtrar por etapa
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Componentes curriculares</h3>
+            </div>
+            <div class="inline-controls">
               <select id="curriculum-filter-stage">
                 <option value="">Todas as etapas</option>
                 <option value="Educação Infantil">Educação Infantil</option>
                 <option value="Ensino Fundamental I (1º ao 5º ano)">Ensino Fundamental I (1º ao 5º ano)</option>
                 <option value="Ensino Fundamental II (6º ao 9º ano)">Ensino Fundamental II (6º ao 9º ano)</option>
-                <option value="EJA (Educação de Jovens e Adultos)">EJA (Educação de Jovens e Adultos)</option>
+                <option value="EJA">EJA</option>
               </select>
-            </label>
-            <label class="small">
-              Filtrar por obrigatoriedade
               <select id="curriculum-filter-requirement">
-                <option value="">Todas (Obrigatórias e Complementares)</option>
-                <option value="obrigatoria">Apenas obrigatórias</option>
-                <option value="complementar_nao_obrigatoria">Apenas complementares (não obrigatórias)</option>
+                <option value="">Todos os tipos</option>
+                <option value="obrigatoria">Obrigatória</option>
+                <option value="complementar_nao_obrigatoria">Complementar (Não obrigatória)</option>
               </select>
-            </label>
+            </div>
           </div>
-
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Etapa de ensino</th><th>Componente / Atividade</th><th>Área / Eixo</th><th>Tipo</th><th>Carga horária</th><th>Ações</th></tr>
+                <tr>
+                  <th>Etapa</th>
+                  <th>Componente</th>
+                  <th>Área</th>
+                  <th>Tipo</th>
+                  <th>CH Anual</th>
+                  <th>Ações</th>
+                </tr>
               </thead>
-              <tbody id="curriculum-body">
-                <tr><td colspan="6">Carregando...</td></tr>
-              </tbody>
+              <tbody id="curriculum-body"></tbody>
             </table>
           </div>
+        </div>
 
-          <div class="panel-sub" style="margin-top: 24px;">
-            <h4>Cadastro de monitores das disciplinas complementares</h4>
-            <p class="muted">Vincule monitores às atividades complementares não obrigatórias da rede ou da unidade escolar.</p>
-            <form id="monitor-form" class="form-grid" data-roles="secretaria,gestor">
-              <label>Nome do monitor(a)
-                <input name="monitor_name" required maxlength="160" placeholder="Ex.: Lucas Ferreira">
-              </label>
-              <label>Disciplina / Atividade complementar
-                <select name="subject" id="monitor-subject-select" required>
-                  <option value="">Selecione a atividade complementar</option>
-                </select>
-              </label>
-              <label>Etapa de ensino
-                <select name="stage" required>
-                  <option value="Educação Infantil">Educação Infantil</option>
-                  <option value="Ensino Fundamental I (1º ao 5º ano)">Ensino Fundamental I (1º ao 5º ano)</option>
-                  <option value="Ensino Fundamental II (6º ao 9º ano)">Ensino Fundamental II (6º ao 9º ano)</option>
-                  <option value="EJA (Educação de Jovens e Adultos)">EJA (Educação de Jovens e Adultos)</option>
-                </select>
-              </label>
-              <label>Escola vinculada
-                <select name="school_id" id="monitor-school">
-                  <option value="">Rede / Todas as escolas</option>
-                </select>
-              </label>
-              <label>Carga horária semanal (h)
-                <input name="weekly_hours" type="number" min="1" max="60" required placeholder="Ex.: 20">
-              </label>
-              <button class="primary" type="submit">Cadastrar monitor</button>
-            </form>
-
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Monitor(a)</th><th>Atividade complementar</th><th>Etapa</th><th>Escola</th><th>Carga semanal</th><th>Ações</th></tr>
-                </thead>
-                <tbody id="monitors-body">
-                  <tr><td colspan="6">Nenhum monitor cadastrado.</td></tr>
-                </tbody>
-              </table>
+        <div class="panel" data-roles="secretaria,gestor">
+          <div class="panel-head">
+            <div>
+              <h3>Cadastrar monitor de atividade complementar</h3>
             </div>
+          </div>
+          <form id="monitor-form" class="form-grid">
+            <label>Nome do monitor *<input type="text" name="monitor_name" required></label>
+            <label>Atividade complementar *<select name="subject" id="monitor-subject-select" required></select></label>
+            <label>Etapa
+              <select name="stage">
+                <option value="Educação Infantil">Educação Infantil</option>
+                <option value="Ensino Fundamental I (1º ao 5º ano)">Ensino Fundamental I (1º ao 5º ano)</option>
+                <option value="Ensino Fundamental II (6º ao 9º ano)">Ensino Fundamental II (6º ao 9º ano)</option>
+              </select>
+            </label>
+            <label>Escola<select name="school_id" id="monitor-school"></select></label>
+            <label>Carga horária semanal (h)<input type="number" name="weekly_hours" value="20" min="1"></label>
+            <button type="submit" class="primary">Cadastrar monitor</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Monitores cadastrados</h3>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Monitor</th>
+                  <th>Atividade</th>
+                  <th>Etapa</th>
+                  <th>Escola</th>
+                  <th>CH Semanal</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="monitors-body"></tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      <section id="page-censo" class="page hidden" data-roles="gestor,secretario_escolar">
+      <!-- PÁGINA: CENSO ESCOLAR -->
+      <section id="page-censo" class="page hidden">
+        <div class="stats">
+          <div class="stat">
+            <span>Unidade escolar</span>
+            <strong id="censo-schools-count">0</strong>
+          </div>
+          <div class="stat">
+            <span>Alunos aptos</span>
+            <strong id="censo-students-count">0</strong>
+          </div>
+          <div class="stat">
+            <span>Matrículas ativas</span>
+            <strong id="censo-enrollments-count">0</strong>
+          </div>
+        </div>
+
+        <div id="census-school-blocks-section" class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Blocos do Censo Escolar</h3>
+              <p id="census-blocks-hint" class="muted small">Selecione um bloco abaixo para preencher ou revisar.</p>
+            </div>
+            <button type="button" id="census-sync-school-data" class="secondary small">Sincronizar dados da escola</button>
+          </div>
+
+          <div id="census-modules-grid" class="census-modules-grid"></div>
+
+          <div id="census-module-editor" class="panel-sub hidden">
+            <div>
+              <h4 id="census-editor-title">Bloco</h4>
+              <p id="census-editor-subtitle" class="muted small"></p>
+            </div>
+            <div id="census-module-fields" class="form-grid"></div>
+            <div class="inline-controls">
+              <button type="button" id="census-save-module" class="primary small">Salvar bloco</button>
+              <button type="button" id="census-close-editor" class="secondary small">Fechar</button>
+            </div>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>CENSO ESCOLAR</h3>
-              <p class="muted">Preencha e edite os blocos temáticos do Censo Escolar da unidade escolar vinculada ao seu perfil.</p>
+              <h3>Fechamento e validação do Censo</h3>
             </div>
           </div>
-
-          <div class="report-grid">
-            <div class="report"><span>Escolas mapeadas</span><strong id="censo-schools-count">—</strong></div>
-            <div class="report"><span>Alunos com nascimento/escola</span><strong id="censo-students-count">—</strong></div>
-            <div class="report"><span>Turmas / Matrículas ativas</span><strong id="censo-enrollments-count">—</strong></div>
-          </div>
-
-          <form id="census-form" class="form-grid" style="margin-top: 16px;">
-            <label>Unidade escolar
-              <select name="school_id" id="census-school" required>
-                <option value="">Selecione a escola</option>
-              </select>
-            </label>
-            <label>Ano de referência
-              <input name="census_year" id="census-year-input" type="number" min="2020" max="2100" required>
-            </label>
+          <form id="census-form" class="form-grid">
+            <label>Escola<select name="school_id" id="census-school"></select></label>
+            <label>Ano do Censo *<input type="number" name="census_year" id="census-year-input" required></label>
             <label>Situação de funcionamento
-              <select name="operating_status" id="census-operating-status" required>
+              <select name="operating_status" id="census-operating-status">
                 <option value="Em atividade">Em atividade</option>
                 <option value="Paralisada">Paralisada</option>
                 <option value="Extinta">Extinta</option>
               </select>
             </label>
-            <label>Etapas ofertadas
-              <input name="offered_stages" id="census-offered-stages" required maxlength="200" placeholder="Ex.: Ed. Infantil, Fund. I">
-            </label>
-            <label>Internet / Laboratório / Acessibilidade
-              <input name="infrastructure_notes" id="census-infrastructure-notes" maxlength="250" placeholder="Ex.: Banda larga, sala de informática">
-            </label>
-            <label>Status de conferência
-              <select name="validation_status" id="census-validation-status" required>
+            <label>Etapas ofertadas<input type="text" name="offered_stages" id="census-offered-stages"></label>
+            <label>Infraestrutura / Conectividade<input type="text" name="infrastructure_notes" id="census-infrastructure-notes"></label>
+            <label>Status de validação
+              <select name="validation_status" id="census-validation-status">
                 <option value="Pendente">Pendente</option>
                 <option value="Em conferência">Em conferência</option>
-                <option value="Validado para Censo">Validado para Censo</option>
+                <option value="Validado">Validado</option>
               </select>
             </label>
-            <button class="primary" type="submit">Salvar mapeamento do Censo</button>
+            <button type="submit" class="primary">Salvar mapeamento do Censo</button>
           </form>
+        </div>
 
-          <div id="census-school-blocks-section" class="panel-sub hidden" style="margin-top: 20px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-              <div>
-                <h4>Blocos temáticos do Censo Escolar</h4>
-                <p class="muted" id="census-blocks-hint" style="margin:2px 0 0;">Clique em um bloco para editar ou atualizar as informações da unidade escolar.</p>
-              </div>
-              <button type="button" class="secondary small" id="census-sync-school-data">Migrar dados da escola</button>
-            </div>
-            <div id="census-modules-grid" class="census-modules-grid" style="margin-top:14px;"></div>
-
-            <div id="census-module-editor" class="hidden" style="margin-top:18px;padding:16px;border-radius:12px;border:1px solid #c9dfbe;background:#ffffff;">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-                <div>
-                  <strong id="census-editor-title" style="font-size:1.05rem;">Bloco do Censo</strong>
-                  <p class="muted small" id="census-editor-subtitle" style="margin:2px 0 0;"></p>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center;">
-                  <button type="button" class="primary small" id="census-save-module">Salvar bloco no Censo</button>
-                  <button type="button" class="secondary small" id="census-close-editor">Fechar bloco</button>
-                </div>
-              </div>
-              <div id="census-module-fields" class="form-grid"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Histórico de mapeamentos</h3>
             </div>
           </div>
-
-          <div class="table-wrap" style="margin-top: 20px;">
+          <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Escola</th><th>INEP</th><th>Ano</th><th>Situação</th><th>Etapas</th><th>Blocos preenchidos</th><th>Status Censo</th><th>Ações</th></tr>
+                <tr>
+                  <th>Escola</th>
+                  <th>INEP</th>
+                  <th>Ano</th>
+                  <th>Situação</th>
+                  <th>Etapas</th>
+                  <th>Blocos</th>
+                  <th>Validação</th>
+                  <th>Ações</th>
+                </tr>
               </thead>
-              <tbody id="census-body">
-                <tr><td colspan="8">Carregando...</td></tr>
-              </tbody>
+              <tbody id="census-body"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <section id="page-relatorios" class="page hidden" data-roles="secretaria,gestor">
+      <!-- PÁGINA: RELATÓRIOS -->
+      <section id="page-relatorios" class="page hidden">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Relatórios e indicadores</h3>
-              <p class="muted" id="report-subtitle">Resumo dos registros aos quais seu perfil tem acesso.</p>
+              <h3>Relatórios gerenciais</h3>
+              <p id="report-subtitle" class="muted small">Resumo dos registros aos quais seu perfil tem acesso.</p>
             </div>
           </div>
 
+          <div id="standard-report-view" class="report-grid">
+            <div class="report"><span>Alunos cadastrados</span><strong id="report-students">0</strong></div>
+            <div class="report"><span>Turmas</span><strong id="report-classes">0</strong></div>
+            <div class="report"><span>Matrículas ativas</span><strong id="report-enrollments">0</strong></div>
+            <div class="report"><span>Atendimentos AEE</span><strong id="report-aee">0</strong></div>
+            <div class="report"><span>Estudantes PcD</span><strong id="report-pcd">0</strong></div>
+          </div>
+
           <div id="secretaria-report-view" class="hidden">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:12px 14px;border-radius:10px;background:#f4f7f9;border:1px solid #dde5ec;">
-              <div>
-                <strong>Números gerais — Rede Municipal</strong>
-                <p class="muted small" style="margin:2px 0 0;">Consolidado geral de todas as escolas cadastradas na rede municipal.</p>
-              </div>
-              <span class="muted small" id="secretaria-report-year">Ano de referência: —</span>
+            <p id="secretaria-report-year" class="small muted"></p>
+            <div class="report-grid" style="margin-bottom: 18px;">
+              <div class="report"><span>Matriculados na rede</span><strong id="sec-report-matriculados">0</strong></div>
+              <div class="report"><span>Total de escolas</span><strong id="sec-report-escolas">0</strong></div>
+              <div class="report"><span>Profissionais nas escolas</span><strong id="sec-report-profissionais">0</strong></div>
+              <div class="report"><span>Alunos únicos (CPF)</span><strong id="sec-report-alunos-unicos">0</strong></div>
+              <div class="report"><span>Matrículas especiais (AEE)</span><strong id="sec-report-matriculas-especiais">0</strong></div>
+              <div class="report"><span>Mudanças de matrícula</span><strong id="sec-report-mudancas-matricula">0</strong></div>
             </div>
 
-            <div class="report-grid">
-              <div class="report" style="background:#eef2fb;border-color:#d5dff5;">
-                <span>Matriculados</span>
-                <strong id="sec-report-matriculados">—</strong>
-                <small class="muted small">Número geral de alunos das escolas</small>
-              </div>
-              <div class="report" style="background:#f9ecec;border-color:#f0d4d4;">
-                <span>Total de escolas</span>
-                <strong id="sec-report-escolas">—</strong>
-                <small class="muted small">Escolas cadastradas na rede</small>
-              </div>
-              <div class="report" style="background:#eaf6ee;border-color:#cce8d5;">
-                <span>Profissionais da educação</span>
-                <strong id="sec-report-profissionais">—</strong>
-                <small class="muted small">Cadastrados nas escolas da rede</small>
-              </div>
-            </div>
-
-            <div class="report-grid" style="margin-top:12px;">
-              <div class="report" style="background:#e8f4fc;border-color:#cde5f7;">
-                <span>Alunos únicos</span>
-                <strong id="sec-report-alunos-unicos">—</strong>
-              </div>
-              <div class="report" style="background:#fbf5e4;border-color:#efe0b8;">
-                <span>Matrículas especiais</span>
-                <strong id="sec-report-matriculas-especiais">—</strong>
-                <small class="muted small">Enturmados em turmas de AEE</small>
-              </div>
-              <div class="report" style="background:#edf7ee;border-color:#d1ead3;">
-                <span>Mudanças na matrícula</span>
-                <strong id="sec-report-mudancas-matricula">—</strong>
-              </div>
-            </div>
-
-            <div class="panel-sub" style="margin-top:24px;border:1px solid #dfe6ed;border-radius:12px;padding:16px;background:#ffffff;">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid #edf1f5;">
+            <div class="panel-sub">
+              <div class="panel-head">
                 <div>
-                  <h4 style="margin:0;">Análise de dados — Registros de aulas</h4>
-                  <p class="muted small" style="margin:2px 0 0;">Monitoramento de lançamentos de aulas, último registro e dias sem lançamento por unidade escolar.</p>
+                  <h4>Monitoramento de registros de aulas</h4>
+                  <p id="sec-lessons-summary" class="muted small"></p>
                 </div>
-                <button type="button" class="secondary small" id="sec-lessons-print">Imprimir</button>
-              </div>
-
-              <div class="inline-controls" style="margin-top:14px;flex-wrap:wrap;align-items:flex-end;">
-                <label class="small">
-                  Ano Letivo
+                <div class="inline-controls">
                   <select id="sec-lessons-year"></select>
-                </label>
-                <label class="small">
-                  Escola
-                  <select id="sec-lessons-school">
-                    <option value="">— Todas as escolas —</option>
-                  </select>
-                </label>
-                <button type="button" class="primary small" id="sec-lessons-refresh">Atualizar</button>
-              </div>
-
-              <div class="report-grid" style="margin-top:16px;">
-                <div class="report" style="background:#f5f9ff;border-left:4px solid #2b6cb0;">
-                  <span>Escolas / Turmas</span>
-                  <strong id="sec-lessons-kpi-classes" style="color:#1e56a0;">—</strong>
-                  <small class="muted small" id="sec-lessons-kpi-schools">— escola(s)</small>
-                </div>
-                <div class="report" style="background:#f3fbf6;border-left:4px solid #2f855a;">
-                  <span>Com registro</span>
-                  <strong id="sec-lessons-kpi-with" style="color:#1f7a4c;">—</strong>
-                </div>
-                <div class="report" style="background:#fff6f6;border-left:4px solid #c53030;">
-                  <span>Sem registro</span>
-                  <strong id="sec-lessons-kpi-without" style="color:#c53030;">—</strong>
-                </div>
-                <div class="report" style="background:#fffbf0;border-left:4px solid #d69e2e;">
-                  <span>Média dias s/ lançamento</span>
-                  <strong id="sec-lessons-kpi-avg-days" style="color:#b7791f;">—</strong>
+                  <select id="sec-lessons-school"></select>
+                  <button type="button" id="sec-lessons-refresh" class="secondary small">Atualizar</button>
+                  <button type="button" id="sec-lessons-print" class="secondary small">Imprimir</button>
                 </div>
               </div>
 
-              <div class="table-wrap" style="margin-top:16px;">
+              <div class="stats">
+                <div class="stat"><span>Turmas no ano</span><strong id="sec-lessons-kpi-classes">0</strong><small id="sec-lessons-kpi-schools">0 escola(s)</small></div>
+                <div class="stat"><span>Escolas com registro</span><strong id="sec-lessons-kpi-with">0</strong></div>
+                <div class="stat"><span>Escolas sem registro</span><strong id="sec-lessons-kpi-without">0</strong></div>
+                <div class="stat"><span>Média dias sem lançamento</span><strong id="sec-lessons-kpi-avg-days">0d</strong></div>
+              </div>
+
+              <div class="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Escola</th>
-                      <th>Famílias</th>
+                      <th>Situação</th>
                       <th>Turmas</th>
                       <th>Registros</th>
-                      <th>Último Reg.</th>
-                      <th>Dias s/ Lanç.</th>
-                      <th>Ação</th>
+                      <th>Último lançamento</th>
+                      <th>Dias s/ lançar</th>
+                      <th>Detalhes</th>
                     </tr>
                   </thead>
-                  <tbody id="sec-lessons-body">
-                    <tr><td colspan="7">Carregando...</td></tr>
-                  </tbody>
+                  <tbody id="sec-lessons-body"></tbody>
                 </table>
               </div>
 
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px;flex-wrap:wrap;">
-                <span class="muted small" id="sec-lessons-summary">—</span>
-              </div>
-
-              <div id="sec-lessons-school-detail" class="hidden" style="margin-top:18px;padding:14px;border-radius:10px;border:1px solid #d7e2ec;background:#f9fbfd;">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+              <div id="sec-lessons-school-detail" class="panel-sub hidden">
+                <div class="panel-head">
                   <div>
-                    <strong id="sec-lessons-detail-title">Turmas da unidade</strong>
-                    <p class="muted small" id="sec-lessons-detail-subtitle" style="margin:2px 0 0;"></p>
+                    <h4 id="sec-lessons-detail-title">Turmas</h4>
+                    <p id="sec-lessons-detail-subtitle" class="muted small"></p>
                   </div>
-                  <button type="button" class="secondary small" id="sec-lessons-close-detail">Fechar turmas</button>
+                  <button type="button" id="sec-lessons-close-detail" class="secondary small">Fechar detalhes</button>
                 </div>
                 <div class="table-wrap">
                   <table>
@@ -926,77 +1146,75 @@
                         <th>Turma</th>
                         <th>Etapa / Turno</th>
                         <th>Registros</th>
-                        <th>Último Reg.</th>
-                        <th>Dias s/ Lanç.</th>
+                        <th>Último lançamento</th>
+                        <th>Dias s/ lançar</th>
                       </tr>
                     </thead>
-                    <tbody id="sec-lessons-detail-body">
-                      <tr><td colspan="5">Selecione uma escola.</td></tr>
-                    </tbody>
+                    <tbody id="sec-lessons-detail-body"></tbody>
                   </table>
                 </div>
               </div>
             </div>
           </div>
-
-          <div id="standard-report-view">
-            <div class="report-grid">
-              <div class="report"><span>Alunos cadastrados</span><strong id="report-students">—</strong></div>
-              <div class="report"><span>Matrículas ativas</span><strong id="report-enrollments">—</strong></div>
-              <div class="report"><span>Enturmados no AEE</span><strong id="report-aee">—</strong></div>
-              <div class="report"><span>Declarados PcD</span><strong id="report-pcd">—</strong></div>
-              <div class="report"><span>Turmas</span><strong id="report-classes">—</strong></div>
-            </div>
-            <p class="muted small">Os indicadores são calculados a partir dos registros disponíveis para seu perfil. Para relatórios oficiais, valide os dados com a escrituração escolar.</p>
-          </div>
         </div>
       </section>
 
-      <section id="page-usuarios" class="page hidden" data-roles="secretaria">
+      <!-- PÁGINA: USUÁRIOS -->
+      <section id="page-usuarios" class="page hidden">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Cadastro de usuários</h3>
-              <p class="muted">Crie contas de acesso para gestores, secretários escolares, professores, monitores ou equipe da secretaria.</p>
+              <h3>Cadastrar novo usuário</h3>
             </div>
           </div>
           <form id="user-form" class="form-grid">
-            <label>Nome completo<input name="full_name" required maxlength="160" placeholder="Ex.: Maria Oliveira"></label>
-            <label>CPF<input name="cpf" maxlength="14" inputmode="numeric" placeholder="000.000.000-00"></label>
-            <label>E-mail institucional<input name="email" type="email" required maxlength="160" placeholder="maria@escola.gov.br"></label>
-            <label>Senha inicial<input name="password" type="password" required minlength="6" placeholder="Mínimo 6 caracteres"></label>
-            <label>Perfil de acesso
+            <label>Nome completo *<input type="text" name="full_name" required></label>
+            <label>CPF<input type="text" name="cpf" maxlength="14" placeholder="000.000.000-00"></label>
+            <label>E-mail *<input type="email" name="email" required></label>
+            <label>Senha inicial *<input type="password" name="password" required minlength="6"></label>
+            <label>Perfil *
               <select name="role" required>
+                <option value="gestor">Gestor escolar</option>
+                <option value="secretario_escolar">Secretário escolar</option>
                 <option value="professor">Professor</option>
                 <option value="monitor_complementar">Monitor de atividade complementar</option>
-                <option value="secretario_escolar">Secretário escolar</option>
-                <option value="gestor">Gestor escolar</option>
                 <option value="secretaria">Secretaria de Educação</option>
               </select>
             </label>
-            <label>Escola vinculada (opcional)
-              <select name="school_id" id="user-school">
-                <option value="">Rede / Não vinculada</option>
-              </select>
-            </label>
-            <button class="primary" type="submit">Cadastrar usuário</button>
+            <label>Unidade escolar<select name="school_id" id="user-school"></select></label>
+            <button type="submit" class="primary">Cadastrar usuário</button>
           </form>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Usuários cadastrados</h3>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Nome</th><th>CPF</th><th>Perfil</th><th>Escola</th><th>Ações</th></tr>
+                <tr>
+                  <th>Nome</th>
+                  <th>CPF</th>
+                  <th>Perfil</th>
+                  <th>Escola vinculada</th>
+                  <th>Ações</th>
+                </tr>
               </thead>
-              <tbody id="users-body">
-                <tr><td colspan="5">Carregando...</td></tr>
-              </tbody>
+              <tbody id="users-body"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <footer>Gestão Escolar Municipal · Ambiente de uso institucional</footer>
-    </main>
+      <footer>
+        Gestão Escolar Municipal · Todos os direitos reservados
+      </footer>
+    </div>
   </div>
+
   <script type="module" src="assets/app.js"></script>
 </body>
 </html>
