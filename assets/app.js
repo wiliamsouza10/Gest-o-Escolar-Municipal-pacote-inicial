@@ -9,7 +9,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_AK9mLZ12c6fUaltPDtTD2Q_oNfG6sXD";
 const CREATE_USER_FUNCTION = "create-user";
 
 // E-mail(s) exclusivos do proprietário do sistema com acesso ao licenciamento de cidades.
-// Substitua pelo e-mail real do proprietário do programa.
 const OWNER_EMAILS = [
   "ws048400@gmail.com"
 ].map(e => e.trim().toLowerCase());
@@ -18,9 +17,6 @@ const configured =
   Boolean(SUPABASE_URL && SUPABASE_URL.startsWith("https://")) &&
   Boolean(SUPABASE_ANON_KEY && SUPABASE_ANON_KEY.trim().length > 0);
 
-// Armazenamento isolado por aba (sessionStorage) para permitir múltiplos logins simultâneos
-// de perfis diferentes (Proprietário, Secretaria, Gestor, Secretário Escolar, Professor) no mesmo navegador
-// e em dispositivos diferentes sem conflito de sessão.
 const tabSessionStorage = {
   getItem: (key) => {
     try {
@@ -70,6 +66,10 @@ const MONITORS_STORAGE_KEY = "ge_monitores_complementares_v1";
 const CENSUS_STORAGE_KEY = "ge_mapeamento_censo_v2";
 const SCHOOL_DRAFT_CENSUS_KEY = "ge_rascunho_censo_escola_v1";
 const CITY_LICENSES_STORAGE_KEY = "ge_licencas_cidades_v1";
+
+function getTodayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function getScopedStorageKey(baseKey) {
   const userScope = currentProfile?.id ? `_${currentProfile.id}` : "";
@@ -319,7 +319,6 @@ function hydrateUserScopedCache() {
 }
 
 const $ = (id) => document.getElementById(id);
-const today = new Date().toISOString().slice(0, 10);
 const roleNames = {
   proprietario: "Proprietário do Sistema",
   secretaria: "Secretaria de Educação",
@@ -561,15 +560,16 @@ function resetAppStateOnSignOut() {
   activeCensusModuleKey = null;
   activeDraftSchoolModuleKey = null;
 
+  $("school-census-module-editor")?.classList.add("hidden");
+  $("census-module-editor")?.classList.add("hidden");
+  $("sec-lessons-school-detail")?.classList.add("hidden");
+  $("notice")?.classList.add("hidden");
+
   $("app-view")?.classList.add("hidden");
   $("login-view")?.classList.remove("hidden");
   if ($("login-error")) $("login-error").textContent = "";
 }
 
-/**
- * Verifica se o perfil e o município estão liberados (active = true) para acessar o sistema.
- * Retorna { ok: true } ou { ok: false, message: string }.
- */
 async function validateMunicipalityReleaseForProfile(profile, emailLower) {
   const isOwner = isOwnerEmail(emailLower) || profile?.role === "proprietario";
   if (isOwner) {
@@ -639,6 +639,7 @@ function showApp(profile, user) {
   $("user-name").textContent = profile.full_name || user.email;
   updateRoleLabel();
   $("avatar").textContent = (profile.full_name || user.email).charAt(0).toUpperCase();
+
   document.querySelectorAll("[data-roles]").forEach(el => {
     const roles = el.dataset.roles.split(",");
     el.classList.toggle("hidden", !roles.includes(currentProfile.role));
@@ -697,6 +698,7 @@ function go(page) {
     relatorios: "Relatórios",
     usuarios: "Cadastro de usuários"
   })[page] || "Gestão Escolar";
+
   if (page === "cidades" && isProprietario()) {
     loadCityLicenses();
   }
@@ -738,7 +740,6 @@ $("login-form")?.addEventListener("submit", async e => {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
-    // Limpa eventual sessão anterior apenas na aba atual antes de autenticar o novo usuário
     await supabase.auth.signOut({ scope: "local" }).catch(() => {});
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -777,7 +778,6 @@ async function loadProfile(user) {
       return;
     }
 
-    // Se o e-mail autenticado for o do proprietário do programa, libera acesso mesmo sem registro prévio na tabela profiles
     if (!data && isOwnerEmail(emailLower)) {
       showApp({
         id: user.id,
@@ -815,7 +815,6 @@ $("logout")?.addEventListener("click", async () => {
   isSigningOut = true;
   try {
     if (supabase) {
-      // Encerra somente a sessão local desta aba/dispositivo sem derrubar outros acessos simultâneos
       await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     }
   } finally {
@@ -866,7 +865,7 @@ function formatBrDate(isoDate) {
 function getEffectiveLicenseStatus(item) {
   if (!item) return "expirada";
   if (item.status === "suspensa") return "suspensa";
-  if (item.expires_at && String(item.expires_at).slice(0, 10) < today) {
+  if (item.expires_at && String(item.expires_at).slice(0, 10) < getTodayIso()) {
     return "expirada";
   }
   return item.status || "ativa";
@@ -1008,7 +1007,7 @@ async function loadCityLicenses() {
         saveLocalJson(CITY_LICENSES_STORAGE_KEY, cachedCityLicenses);
       }
     } catch (err) {
-      console.warn("Tabela city_licenses ainda não disponível no Supabase (usando cache local/municipalities):", formatSupabaseError(err));
+      console.warn("Tabela city_licenses ainda não disponível no Supabase:", formatSupabaseError(err));
     }
 
     try {
@@ -1078,7 +1077,7 @@ $("city-license-form")?.addEventListener("submit", async e => {
   }
 
   const licenseStatus = raw.status || "ativa";
-  const isActiveMunicipality = licenseStatus === "ativa" && (!raw.expires_at || String(raw.expires_at).slice(0, 10) >= today);
+  const isActiveMunicipality = licenseStatus === "ativa" && (!raw.expires_at || String(raw.expires_at).slice(0, 10) >= getTodayIso());
 
   const newLicense = {
     id: `lic-${Date.now()}`,
@@ -1192,9 +1191,10 @@ $("cities-body")?.addEventListener("click", async e => {
     const target = cachedCityLicenses.find(c => c.id === id);
     if (!target) return;
 
-    const baseDateStr = target.expires_at && String(target.expires_at).slice(0, 10) > today
+    const currentToday = getTodayIso();
+    const baseDateStr = target.expires_at && String(target.expires_at).slice(0, 10) > currentToday
       ? String(target.expires_at).slice(0, 10)
-      : today;
+      : currentToday;
     const baseDate = new Date(`${baseDateStr}T12:00:00Z`);
     baseDate.setUTCFullYear(baseDate.getUTCFullYear() + 1);
     const nextExpires = baseDate.toISOString().slice(0, 10);
@@ -1503,10 +1503,10 @@ function initSecretariaLessonMonitoringControls() {
     yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
     if (prevYear && years.includes(Number(prevYear))) {
       yearSelect.value = prevYear;
-    } else if (years.includes(2026)) {
-      yearSelect.value = "2026";
     } else if (years.includes(currentYear)) {
       yearSelect.value = String(currentYear);
+    } else if (years.includes(2026)) {
+      yearSelect.value = "2026";
     }
   }
 
@@ -1588,9 +1588,6 @@ function buildSecretariaLessonMetrics() {
 
   const schoolRows = targetSchools.map(school => {
     const sClasses = yearClasses.filter(c => c.school_id === school.id);
-    let recordCount = 0;
-    let lastMs = null;
-
     const schoolLessons = cachedLessons.filter(l => {
       const ms = parseLessonDateToMs(l.lesson_date);
       if (!ms || new Date(ms).getUTCFullYear() !== selectedYear) return false;
@@ -1598,7 +1595,8 @@ function buildSecretariaLessonMetrics() {
       return cls?.school_id === school.id;
     });
 
-    recordCount = schoolLessons.length;
+    const recordCount = schoolLessons.length;
+    let lastMs = null;
     for (const l of schoolLessons) {
       const ms = parseLessonDateToMs(l.lesson_date);
       if (ms && (!lastMs || ms > lastMs)) lastMs = ms;
@@ -2516,7 +2514,7 @@ function renderUsers() {
   }).join("") || '<tr><td colspan="5">Nenhum usuário cadastrado.</td></tr>';
 }
 
-// --- MATRIZ CURRICULAR (OBRIGATÓRIA E COMPLEMENTAR NÃO OBRIGATÓRIA) ---
+// --- MATRIZ CURRICULAR ---
 function formatRequirementLabel(type) {
   return type === "complementar_nao_obrigatoria"
     ? "Complementar (Não obrigatória)"
@@ -2683,7 +2681,7 @@ $("monitors-body")?.addEventListener("click", e => {
   notice("Monitor removido.");
 });
 
-// --- MAPEAMENTO DO CENSO ESCOLAR (MIGRAÇÃO COMPLETA E EDIÇÃO PARA SECRETÁRIO ESCOLAR E GESTOR ESCOLAR) ---
+// --- MAPEAMENTO DO CENSO ESCOLAR ---
 function getSelectedCensusSchoolId() {
   if (!canAccessCensus()) return "";
   return currentProfile?.school_id || "";
@@ -3626,7 +3624,7 @@ $("save-attendance")?.addEventListener("click", async () => {
   }
 });
 
-if ($("attendance-date")) $("attendance-date").value = today;
+if ($("attendance-date")) $("attendance-date").value = getTodayIso();
 document.querySelectorAll('input[name="school_year"]').forEach(x => {
   x.value = new Date().getFullYear();
 });
